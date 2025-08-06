@@ -77,7 +77,6 @@ const QuizPage = () => {
         }
 
         setIsSubmitting(true);
-        const loadingToast = showLoading("Đang nộp bài...");
 
         let calculatedScore = 0;
         quizQuestions.forEach(q => {
@@ -85,8 +84,17 @@ const QuizPage = () => {
                 calculatedScore++;
             }
         });
-        
         const finalScore = (calculatedScore / quizQuestions.length) * 10;
+
+        if (!supabase) {
+            showError("Lỗi cấu hình: Không thể lưu kết quả vào hệ thống.");
+            console.error("Supabase client is not initialized. Check environment variables.");
+            setScore(finalScore);
+            setIsSubmitting(false);
+            return;
+        }
+
+        const loadingToast = showLoading("Đang nộp bài...");
         
         try {
             const { error } = await supabase.from("quiz_results").insert([
@@ -112,7 +120,7 @@ const QuizPage = () => {
             dismissToast(loadingToast);
             setIsSubmitting(false);
             setScore(finalScore);
-            showError(`Lưu kết quả thất bại. Vui lòng kiểm tra lại cấu hình Supabase.`);
+            showError(`Lưu kết quả thất bại. Điểm của bạn là ${finalScore.toFixed(1)} nhưng không thể lưu vào hệ thống.`);
             console.error("Error saving to Supabase:", error);
         }
     };
