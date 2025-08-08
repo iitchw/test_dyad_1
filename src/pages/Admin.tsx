@@ -6,40 +6,46 @@ import { MadeWithDyad } from "@/components/made-with-dyad";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { QuizResultDetail } from "@/components/QuizResultDetail";
 
 interface QuizResult {
   id: string;
   created_at: string;
   full_name: string;
+  date_of_birth: string;
+  phone_number: string;
   score: number;
+  status: 'pending' | 'approved' | 'redo_required';
+  answers: { [key: string]: string };
 }
 
 const AdminPage = () => {
   const [results, setResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const isLoggedIn = sessionStorage.getItem("isAdminLoggedIn");
     if (isLoggedIn !== "true") {
-      navigate("/"); // Chuyển hướng về trang chủ nếu chưa đăng nhập
+      navigate("/");
     }
   }, [navigate]);
 
   useEffect(() => {
     const fetchResults = async () => {
+      if (sessionStorage.getItem("isAdminLoggedIn") !== "true") return;
       setLoading(true);
       setError(null);
       try {
         const { data, error } = await supabase
           .from("quiz_results")
-          .select("id, created_at, full_name, score")
+          .select("*")
           .order("created_at", { ascending: false });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
         setResults(data || []);
       } catch (err: any) {
         console.error("Error fetching quiz results:", err);
@@ -48,16 +54,30 @@ const AdminPage = () => {
         setLoading(false);
       }
     };
-
-    // Chỉ fetch dữ liệu nếu đã đăng nhập
-    if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
-        fetchResults();
-    }
+    fetchResults();
   }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem("isAdminLoggedIn");
     navigate("/");
+  };
+
+  const handleStatusUpdate = (resultId: string, newStatus: 'approved' | 'redo_required') => {
+    setResults(prevResults =>
+      prevResults.map(r => (r.id === resultId ? { ...r, status: newStatus } : r))
+    );
+  };
+
+  const getStatusBadge = (status: QuizResult['status']) => {
+    switch (status) {
+      case 'approved':
+        return <Badge variant="default" className="bg-green-600">Đã duyệt</Badge>;
+      case 'redo_required':
+        return <Badge variant="destructive">Yêu cầu làm lại</Badge>;
+      case 'pending':
+      default:
+        return <Badge variant="secondary">Chờ xem xét</Badge>;
+    }
   };
 
   return (
@@ -79,6 +99,7 @@ const AdminPage = () => {
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
                     <TableHead>Ngày làm bài</TableHead>
+                    <TableHead>Trạng thái</TableHead>
                     <TableHead className="text-right">Điểm</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -88,20 +109,22 @@ const AdminPage = () => {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
                       </TableRow>
                     ))
                   ) : results.length > 0 ? (
                     results.map((result) => (
-                      <TableRow key={result.id}>
+                      <TableRow key={result.id} onClick={() => setSelectedResult(result)} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium">{result.full_name}</TableCell>
                         <TableCell>{new Date(result.created_at).toLocaleDateString("vi-VN")}</TableCell>
+                        <TableCell>{getStatusBadge(result.status)}</TableCell>
                         <TableCell className="text-right">{result.score.toFixed(1)}</TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center">
+                      <TableCell colSpan={4} className="text-center">
                         Chưa có kết quả nào được nộp.
                       </TableCell>
                     </TableRow>
@@ -112,6 +135,14 @@ const AdminPage = () => {
           </CardContent>
         </Card>
       </div>
+      {selectedResult && (
+        <QuizResultDetail
+          isOpen={!!selectedResult}
+          onClose={() => setSelectedResult(null)}
+          result={selectedResult}
+          onStatusUpdate={handleStatusUpdate}
+        />
+      )}
       <div className="mt-auto pt-8">
         <MadeWithDyad />
       </div>
