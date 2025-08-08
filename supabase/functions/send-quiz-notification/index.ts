@@ -16,9 +16,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// !!! THAY ĐỔI: Vui lòng thay thế bằng địa chỉ email quản trị của bạn
-const ADMIN_EMAIL = "your-admin-email@example.com";
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -27,13 +24,17 @@ serve(async (req) => {
   try {
     const { fullName, score, dob, phone, gender } = await req.json()
     const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    const adminEmail = Deno.env.get('ADMIN_EMAIL_RECIPIENT')
 
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY is not set in environment variables.")
-      // Không trả về lỗi cho client để không chặn luồng nộp bài
+    if (!resendApiKey || !adminEmail) {
+      let errorMessage = "";
+      if (!resendApiKey) errorMessage += "RESEND_API_KEY is not set. ";
+      if (!adminEmail) errorMessage += "ADMIN_EMAIL_RECIPIENT is not set. ";
+      console.error(errorMessage.trim());
+      // Return a success response to the client to avoid breaking the user flow.
       return new Response(JSON.stringify({ message: "Email configuration missing on server." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200, // Trả về thành công để không báo lỗi cho người dùng
+        status: 200,
       })
     }
 
@@ -50,8 +51,8 @@ serve(async (req) => {
       <p>Bạn có thể xem lại bài làm chi tiết trong trang quản trị.</p>
     `;
 
-    // Lưu ý: 'onboarding@resend.dev' chỉ dành cho mục đích phát triển.
-    // Để sử dụng trong môi trường production, bạn cần xác thực tên miền của mình với Resend.
+    // IMPORTANT: 'onboarding@resend.dev' is for development only.
+    // For production, you must verify your own domain with Resend.
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -59,8 +60,8 @@ serve(async (req) => {
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'Quiz System <onboarding@resend.dev>',
-        to: ADMIN_EMAIL,
+        from: 'Hệ thống Trắc nghiệm <onboarding@resend.dev>',
+        to: adminEmail,
         subject: `Bài kiểm tra mới từ ${fullName}`,
         html: emailHtml,
       }),
@@ -68,16 +69,15 @@ serve(async (req) => {
 
     if (!res.ok) {
       const errorBody = await res.text();
-      console.error("Gửi email thất bại:", errorBody);
-      // Không trả về lỗi để tránh làm gián đoạn người dùng
+      console.error("Failed to send email:", res.status, errorBody);
     }
 
-    return new Response(JSON.stringify({ message: "Yêu cầu gửi email đã được xử lý" }), {
+    return new Response(JSON.stringify({ message: "Email notification request processed" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
-    console.error(error.message)
+    console.error("Internal server error:", error.message)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

@@ -91,7 +91,7 @@ const QuizPage = () => {
             setScore(finalScore);
             showSuccess("Nộp bài thành công! Kết quả của bạn đã được lưu.");
 
-            // Gọi Edge Function để gửi email, không chặn luồng chính
+            // Call Edge Function to send email, non-blocking
             supabase.functions.invoke('send-quiz-notification', {
                 body: {
                     fullName,
