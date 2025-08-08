@@ -5,8 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { quizQuestions } from "@/lib/quizData";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { CheckCircle2, XCircle, Printer } from "lucide-react";
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 interface QuizResult {
   id: string;
@@ -49,71 +47,8 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
     }
   };
 
-  const handleExportToPdf = async () => {
-    const loadingToast = showLoading("Đang tạo file PDF...");
-    const elementToPrint = document.getElementById('printable-quiz-result');
-
-    if (!elementToPrint) {
-        dismissToast(loadingToast);
-        showError("Không tìm thấy nội dung để xuất PDF.");
-        return;
-    }
-
-    const scrollAreaViewport = elementToPrint.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
-    const footer = elementToPrint.querySelector('.no-print') as HTMLElement;
-
-    // Store original styles to restore them later
-    const originalViewportStyle = scrollAreaViewport ? scrollAreaViewport.style.cssText : '';
-    const originalFooterDisplay = footer ? footer.style.display : '';
-
-    // Temporarily modify styles for full content capture
-    if (footer) footer.style.display = 'none';
-    if (scrollAreaViewport) {
-        scrollAreaViewport.style.height = 'auto';
-        scrollAreaViewport.style.maxHeight = 'none';
-        scrollAreaViewport.style.overflow = 'visible';
-    }
-
-    try {
-        const canvas = await html2canvas(elementToPrint, {
-            scale: 2,
-            useCORS: true,
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfPageHeight = pdf.internal.pageSize.getHeight();
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgHeightInPdf = (imgProps.height * pdfWidth) / imgProps.width;
-
-        let heightLeft = imgHeightInPdf;
-        let position = 0;
-
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
-        heightLeft -= pdfPageHeight;
-
-        while (heightLeft > 0) {
-            position -= pdfPageHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
-            heightLeft -= pdfPageHeight;
-        }
-
-        pdf.save(`ket-qua-${result.full_name.replace(/\s/g, '_')}.pdf`);
-        
-        showSuccess("Xuất PDF thành công!");
-
-    } catch (error) {
-        console.error("Lỗi khi xuất PDF:", error);
-        showError("Đã xảy ra lỗi khi tạo file PDF.");
-    } finally {
-        // Restore original styles
-        if (footer) footer.style.display = originalFooterDisplay;
-        if (scrollAreaViewport) scrollAreaViewport.style.cssText = originalViewportStyle;
-        dismissToast(loadingToast);
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -160,9 +95,9 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
           </div>
         </ScrollArea>
         <DialogFooter className="pt-4 no-print">
-          <Button variant="outline" onClick={handleExportToPdf}>
+          <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
-            Xuất PDF
+            In kết quả
           </Button>
           <Button variant="outline" onClick={() => handleStatusUpdate('redo_required')}>Yêu cầu làm lại</Button>
           <Button onClick={() => handleStatusUpdate('approved')}>Phê duyệt kết quả</Button>
