@@ -14,12 +14,14 @@ import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { vi } from 'date-fns/locale';
 
 const QuizPage = () => {
     const [fullName, setFullName] = useState("");
     const [dob, setDob] = useState<Date>();
+    const [dobInput, setDobInput] = useState("");
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [phone, setPhone] = useState("");
     const [gender, setGender] = useState("");
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
@@ -34,11 +36,34 @@ const QuizPage = () => {
     const resetQuiz = () => {
         setFullName("");
         setDob(undefined);
+        setDobInput("");
         setPhone("");
         setGender("");
         setAnswers({});
         setScore(null);
         setIsSubmitting(false);
+    };
+
+    const handleDobInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setDobInput(value);
+        const parsedDate = parse(value, 'dd/MM/yyyy', new Date());
+        if (isValid(parsedDate)) {
+            const year = parsedDate.getFullYear();
+            if (year > 1900 && year <= new Date().getFullYear()) {
+                setDob(parsedDate);
+            }
+        } else {
+            setDob(undefined);
+        }
+    };
+
+    const handleCalendarSelect = (selectedDate: Date | undefined) => {
+        if (selectedDate) {
+            setDob(selectedDate);
+            setDobInput(format(selectedDate, 'dd/MM/yyyy', { locale: vi }));
+            setIsCalendarOpen(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -152,25 +177,26 @@ const QuizPage = () => {
                                     <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Ngày sinh</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                    "w-full justify-start text-left font-normal",
-                                                    !dob && "text-muted-foreground"
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {dob ? format(dob, "PPP", { locale: vi }) : <span>Chọn ngày</span>}
-                                            </Button>
-                                        </PopoverTrigger>
+                                    <Label htmlFor="dob">Ngày sinh</Label>
+                                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                        <div className="relative">
+                                            <Input
+                                                id="dob"
+                                                placeholder="dd/MM/yyyy"
+                                                value={dobInput}
+                                                onChange={handleDobInputChange}
+                                            />
+                                            <PopoverTrigger asChild>
+                                                <Button variant="ghost" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent">
+                                                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                        </div>
                                         <PopoverContent className="w-auto p-0">
                                             <Calendar
                                                 mode="single"
                                                 selected={dob}
-                                                onSelect={setDob}
+                                                onSelect={handleCalendarSelect}
                                                 initialFocus
                                                 captionLayout="dropdown-buttons"
                                                 fromYear={1950}
@@ -190,10 +216,6 @@ const QuizPage = () => {
                                         <div className="flex items-center space-x-2">
                                             <RadioGroupItem value="Nữ" id="gender-female" />
                                             <Label htmlFor="gender-female">Nữ</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="Khác" id="gender-other" />
-                                            <Label htmlFor="gender-other">Khác</Label>
                                         </div>
                                     </RadioGroup>
                                 </div>
