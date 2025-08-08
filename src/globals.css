@@ -120,14 +120,17 @@
     padding: 1rem !important;
     background: white !important;
     color: black !important;
+    transform: none !important;
   }
 
   .no-print {
     display: none !important;
   }
 
+  [data-radix-scroll-area-root],
   [data-radix-scroll-area-viewport] {
     height: auto !important;
+    max-height: none !important;
     overflow-y: visible !important;
   }
 
