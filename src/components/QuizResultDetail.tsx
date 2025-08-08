@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { quizQuestions } from "@/lib/quizData";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Send } from "lucide-react";
 
 interface QuizResult {
   id: string;
@@ -13,6 +14,7 @@ interface QuizResult {
   date_of_birth: string;
   phone_number: string;
   gender: string;
+  email: string | null;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
@@ -26,6 +28,8 @@ interface Props {
 }
 
 export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Props) => {
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   const handleStatusUpdate = async (newStatus: 'approved' | 'redo_required') => {
     const loadingToast = showLoading("Đang cập nhật trạng thái...");
     try {
@@ -47,6 +51,37 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
     }
   };
 
+  const handleSendResultEmail = async () => {
+    if (!result.email) {
+      showError("Không có địa chỉ email của người dùng để gửi.");
+      return;
+    }
+    setIsSendingEmail(true);
+    const loadingToast = showLoading("Đang gửi email...");
+
+    try {
+      const { error } = await supabase.functions.invoke('send-final-result', {
+        body: {
+          recipientEmail: result.email,
+          fullName: result.full_name,
+          score: result.score,
+          status: result.status,
+        },
+      });
+
+      dismissToast(loadingToast);
+      if (error) throw error;
+
+      showSuccess(`Email đã được gửi thành công đến ${result.email}`);
+    } catch (error: any) {
+      dismissToast(loadingToast);
+      showError("Gửi email thất bại. Vui lòng thử lại.");
+      console.error("Error sending result email:", error);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl">
@@ -55,8 +90,7 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
           <DialogDescription asChild>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
                 <span><strong>Ngày làm bài:</strong> {new Date(result.created_at).toLocaleString('vi-VN')}</span>
-                <span><strong>Ngày sinh:</strong> {new Date(result.date_of_birth).toLocaleDateString('vi-VN')}</span>
-                <span><strong>Giới tính:</strong> {result.gender}</span>
+                <span><strong>Email:</strong> {result.email || 'Không có'}</span>
                 <span className="font-semibold"><strong>Điểm số:</strong> {result.score.toFixed(1)}/10</span>
             </div>
           </DialogDescription>
@@ -90,9 +124,15 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
             })}
           </div>
         </ScrollArea>
-        <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={() => handleStatusUpdate('redo_required')}>Yêu cầu làm lại</Button>
-          <Button onClick={() => handleStatusUpdate('approved')}>Phê duyệt kết quả</Button>
+        <DialogFooter className="pt-4 sm:justify-between">
+          <Button variant="secondary" onClick={handleSendResultEmail} disabled={!result.email || isSendingEmail}>
+            <Send className="mr-2 h-4 w-4" />
+            {isSendingEmail ? "Đang gửi..." : "Gửi Email Kết Quả"}
+          </Button>
+          <div className="flex gap-2 mt-2 sm:mt-0">
+            <Button variant="outline" onClick={() => handleStatusUpdate('redo_required')}>Yêu cầu làm lại</Button>
+            <Button onClick={() => handleStatusUpdate('approved')}>Phê duyệt kết quả</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
