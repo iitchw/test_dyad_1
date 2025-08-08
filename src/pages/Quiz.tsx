@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { MadeWithDyad } from "@/components/made-with-dyad";
@@ -51,6 +52,7 @@ const QuizPage = () => {
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
     const [score, setScore] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSupabaseConnected = !!supabase;
 
     const handleAnswerChange = (questionId: string, value: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -86,7 +88,7 @@ const QuizPage = () => {
         });
         const finalScore = (calculatedScore / quizQuestions.length) * 10;
 
-        if (!supabase) {
+        if (!isSupabaseConnected) {
             showError("Lỗi cấu hình: Không thể lưu kết quả vào hệ thống.");
             console.error("Supabase client is not initialized. Check environment variables.");
             setScore(finalScore);
@@ -150,8 +152,15 @@ const QuizPage = () => {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
             <Card className="w-full max-w-4xl">
                 <CardHeader>
-                    <CardTitle className="text-3xl">Bài kiểm tra kiến thức</CardTitle>
-                    <CardDescription>Vui lòng điền thông tin và trả lời các câu hỏi dưới đây.</CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="text-3xl">Bài kiểm tra kiến thức</CardTitle>
+                            <CardDescription>Vui lòng điền thông tin và trả lời các câu hỏi dưới đây.</CardDescription>
+                        </div>
+                        <Badge className={isSupabaseConnected ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
+                            {isSupabaseConnected ? "Đã kết nối CSDL" : "Chưa kết nối CSDL"}
+                        </Badge>
+                    </div>
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-8 py-6">
