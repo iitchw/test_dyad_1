@@ -59,15 +59,25 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
         return;
     }
 
+    const scrollAreaViewport = elementToPrint.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
     const footer = elementToPrint.querySelector('.no-print') as HTMLElement;
+
+    // Store original styles to restore them later
+    const originalViewportStyle = scrollAreaViewport ? scrollAreaViewport.style.cssText : '';
+    const originalFooterDisplay = footer ? footer.style.display : '';
+
+    // Temporarily modify styles for full content capture
     if (footer) footer.style.display = 'none';
+    if (scrollAreaViewport) {
+        scrollAreaViewport.style.height = 'auto';
+        scrollAreaViewport.style.maxHeight = 'none';
+        scrollAreaViewport.style.overflow = 'visible';
+    }
 
     try {
         const canvas = await html2canvas(elementToPrint, {
-            scale: 2, // Tăng chất lượng ảnh
+            scale: 2,
             useCORS: true,
-            height: elementToPrint.scrollHeight,
-            windowHeight: elementToPrint.scrollHeight,
         });
 
         const imgData = canvas.toDataURL('image/png');
@@ -81,27 +91,28 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
         let heightLeft = imgHeightInPdf;
         let position = 0;
 
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
         heightLeft -= pdfPageHeight;
 
         while (heightLeft > 0) {
             position -= pdfPageHeight;
             pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
             heightLeft -= pdfPageHeight;
         }
 
         pdf.save(`ket-qua-${result.full_name.replace(/\s/g, '_')}.pdf`);
         
-        dismissToast(loadingToast);
         showSuccess("Xuất PDF thành công!");
 
     } catch (error) {
         console.error("Lỗi khi xuất PDF:", error);
-        dismissToast(loadingToast);
         showError("Đã xảy ra lỗi khi tạo file PDF.");
     } finally {
-        if (footer) footer.style.display = 'flex';
+        // Restore original styles
+        if (footer) footer.style.display = originalFooterDisplay;
+        if (scrollAreaViewport) scrollAreaViewport.style.cssText = originalViewportStyle;
+        dismissToast(loadingToast);
     }
   };
 
