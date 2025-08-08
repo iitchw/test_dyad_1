@@ -21,7 +21,6 @@ const QuizPage = () => {
     const [fullName, setFullName] = useState("");
     const [dob, setDob] = useState<Date>();
     const [phone, setPhone] = useState("");
-    const [email, setEmail] = useState("");
     const [gender, setGender] = useState("");
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
     const [score, setScore] = useState<number | null>(null);
@@ -36,7 +35,6 @@ const QuizPage = () => {
         setFullName("");
         setDob(undefined);
         setPhone("");
-        setEmail("");
         setGender("");
         setAnswers({});
         setScore(null);
@@ -45,8 +43,8 @@ const QuizPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!fullName || !dob || !phone || !gender || !email) {
-            showError("Vui lòng điền đầy đủ thông tin cá nhân, bao gồm cả email.");
+        if (!fullName || !dob || !phone || !gender) {
+            showError("Vui lòng điền đầy đủ thông tin cá nhân.");
             return;
         }
         if (Object.keys(answers).length !== quizQuestions.length) {
@@ -79,7 +77,6 @@ const QuizPage = () => {
             date_of_birth: format(dob, "yyyy-MM-dd"),
             phone_number: phone,
             gender: gender,
-            email: email,
             answers: answers,
             score: finalScore,
         };
@@ -93,21 +90,6 @@ const QuizPage = () => {
             
             setScore(finalScore);
             showSuccess("Nộp bài thành công! Kết quả của bạn đã được lưu.");
-
-            supabase.functions.invoke('send-quiz-notification', {
-                body: {
-                    fullName,
-                    score: finalScore,
-                    dob: format(dob, "PPP", { locale: vi }),
-                    phone,
-                    gender,
-                    email,
-                },
-            }).then(({ error: funcError }) => {
-                if (funcError) {
-                    console.error("Gửi email thông báo thất bại:", funcError.message);
-                }
-            });
 
         } catch (error: any) {
             dismissToast(loadingToast);
@@ -166,10 +148,6 @@ const QuizPage = () => {
                                     <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nguyễn Văn A" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nguyenvana@email.com" required />
-                                </div>
-                                <div className="space-y-2">
                                     <Label htmlFor="phone">Số điện thoại</Label>
                                     <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" required />
                                 </div>
@@ -202,7 +180,7 @@ const QuizPage = () => {
                                         </PopoverContent>
                                     </Popover>
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
+                                <div className="space-y-2">
                                     <Label>Giới tính</Label>
                                     <RadioGroup value={gender} onValueChange={setGender} className="flex items-center space-x-4 pt-2">
                                         <div className="flex items-center space-x-2">

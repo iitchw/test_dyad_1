@@ -16,7 +16,6 @@ interface QuizResult {
   date_of_birth: string;
   phone_number: string;
   gender: string;
-  email: string | null;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
