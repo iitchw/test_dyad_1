@@ -1,117 +1,119 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MadeWithDyad } from "@/components/made-with-dyad";
-import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
-
-interface QuizResult {
-  id: string;
-  created_at: string;
-  full_name: string;
-  score: number;
-}
+import { showError } from "@/utils/toast";
+import { FileText, Shield } from "lucide-react";
 
 const Index = () => {
-  const [results, setResults] = useState<QuizResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase
-          .from("quiz_results")
-          .select("id, created_at, full_name, score")
-          .order("created_at", { ascending: false })
-          .limit(10); // Lấy 10 kết quả gần nhất
-
-        if (error) {
-          throw error;
-        }
-        setResults(data || []);
-      } catch (err: any) {
-        console.error("Error fetching quiz results:", err);
-        setError("Không thể tải kết quả. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, []);
+  const handleAdminLogin = () => {
+    if (username === "admin" && password === "1234512345") {
+      sessionStorage.setItem("isAdminLoggedIn", "true");
+      setIsLoginDialogOpen(false);
+      navigate("/admin");
+    } else {
+      showError("Tên người dùng hoặc mật khẩu không đúng.");
+    }
+  };
+  
+  const handleCardClick = () => {
+    setIsLoginDialogOpen(true);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 flex flex-col items-center">
-      <div className="w-full max-w-4xl mx-auto space-y-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold">Chào mừng đến với Bài kiểm tra</CardTitle>
-            <CardDescription>
-              Kiểm tra kiến thức của bạn về Thông tư 07/2014/TT-BYT.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-6 text-gray-600 dark:text-gray-300">
-              Vui lòng nhấn nút bên dưới để bắt đầu bài kiểm tra.
-            </p>
-            <Link to="/quiz">
-              <Button size="lg">Bắt đầu kiểm tra</Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Báo cáo kết quả</CardTitle>
-            <CardDescription>Danh sách 10 bài kiểm tra đã được hoàn thành gần đây nhất.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && <p className="text-red-500 text-center">{error}</p>}
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[250px]">Họ và tên</TableHead>
-                    <TableHead>Ngày làm bài</TableHead>
-                    <TableHead className="text-right">Điểm</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : results.length > 0 ? (
-                    results.map((result) => (
-                      <TableRow key={result.id}>
-                        <TableCell className="font-medium">{result.full_name}</TableCell>
-                        <TableCell>{new Date(result.created_at).toLocaleDateString("vi-VN")}</TableCell>
-                        <TableCell className="text-right">{result.score.toFixed(1)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center">
-                        Chưa có kết quả nào được nộp.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Hệ thống Kiểm tra Trực tuyến</h1>
+        <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">Chọn một chức năng để bắt đầu.</p>
       </div>
-      <div className="mt-auto pt-8">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+        <Link to="/quiz" className="block">
+          <Card className="h-full hover:shadow-lg hover:border-primary transition-all duration-300">
+            <CardHeader className="flex-row items-center gap-4 p-4">
+              <FileText className="w-10 h-10 text-primary" />
+              <CardTitle className="text-2xl">Làm bài kiểm tra</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <p className="text-gray-600 dark:text-gray-400">
+                Bắt đầu bài kiểm tra kiến thức về Thông tư 07/2014/TT-BYT.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+            <Card onClick={handleCardClick} className="h-full hover:shadow-lg hover:border-primary transition-all duration-300 cursor-pointer">
+              <CardHeader className="flex-row items-center gap-4 p-4">
+                <Shield className="w-10 h-10 text-primary" />
+                <CardTitle className="text-2xl">Quản lý bài kiểm tra</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <p className="text-gray-600 dark:text-gray-400">
+                  Truy cập khu vực quản lý để xem tất cả kết quả. Yêu cầu đăng nhập.
+                </p>
+              </CardContent>
+            </Card>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Đăng nhập Quản trị</DialogTitle>
+              <DialogDescription>
+                Vui lòng nhập thông tin đăng nhập để truy cập khu vực quản lý.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="username" className="text-right">
+                  Tên người dùng
+                </Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="col-span-3"
+                  placeholder="admin"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  Mật khẩu
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="col-span-3"
+                  placeholder="••••••••••"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" onClick={handleAdminLogin}>Đăng nhập</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="mt-auto pt-12">
         <MadeWithDyad />
       </div>
     </div>
