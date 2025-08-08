@@ -12,6 +12,7 @@ interface QuizResult {
   full_name: string;
   date_of_birth: string;
   phone_number: string;
+  gender: string;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
@@ -51,8 +52,13 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Chi tiết bài kiểm tra của: {result.full_name}</DialogTitle>
-          <DialogDescription>
-            Ngày làm bài: {new Date(result.created_at).toLocaleString('vi-VN')} - Điểm số: {result.score.toFixed(1)}/10
+          <DialogDescription asChild>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
+                <span><strong>Ngày làm bài:</strong> {new Date(result.created_at).toLocaleString('vi-VN')}</span>
+                <span><strong>Ngày sinh:</strong> {new Date(result.date_of_birth).toLocaleDateString('vi-VN')}</span>
+                <span><strong>Giới tính:</strong> {result.gender}</span>
+                <span className="font-semibold"><strong>Điểm số:</strong> {result.score.toFixed(1)}/10</span>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[60vh] pr-6">

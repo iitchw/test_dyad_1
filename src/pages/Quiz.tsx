@@ -10,11 +10,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { quizQuestions } from "@/lib/quizData";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { vi } from 'date-fns/locale';
 
 const QuizPage = () => {
     const [fullName, setFullName] = useState("");
-    const [dob, setDob] = useState("");
+    const [dob, setDob] = useState<Date>();
     const [phone, setPhone] = useState("");
+    const [gender, setGender] = useState("");
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
     const [score, setScore] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,8 +33,9 @@ const QuizPage = () => {
 
     const resetQuiz = () => {
         setFullName("");
-        setDob("");
+        setDob(undefined);
         setPhone("");
+        setGender("");
         setAnswers({});
         setScore(null);
         setIsSubmitting(false);
@@ -35,7 +43,7 @@ const QuizPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!fullName || !dob || !phone) {
+        if (!fullName || !dob || !phone || !gender) {
             showError("Vui lòng điền đầy đủ thông tin cá nhân.");
             return;
         }
@@ -64,25 +72,39 @@ const QuizPage = () => {
 
         const loadingToast = showLoading("Đang nộp bài...");
         
+        const submissionData = {
+            full_name: fullName,
+            date_of_birth: format(dob, "yyyy-MM-dd"),
+            phone_number: phone,
+            gender: gender,
+            answers: answers,
+            score: finalScore,
+        };
+
         try {
-            const { error } = await supabase.from("quiz_results").insert([
-                {
-                    full_name: fullName,
-                    date_of_birth: dob,
-                    phone_number: phone,
-                    answers: answers,
-                    score: finalScore,
-                },
-            ]);
+            const { error } = await supabase.from("quiz_results").insert([submissionData]);
 
             dismissToast(loadingToast);
             
-            if (error) {
-                throw error;
-            }
+            if (error) throw error;
             
             setScore(finalScore);
             showSuccess("Nộp bài thành công! Kết quả của bạn đã được lưu.");
+
+            // Gọi Edge Function để gửi email, không chặn luồng chính
+            supabase.functions.invoke('send-quiz-notification', {
+                body: {
+                    fullName,
+                    score: finalScore,
+                    dob: format(dob, "PPP", { locale: vi }),
+                    phone,
+                    gender,
+                },
+            }).then(({ error: funcError }) => {
+                if (funcError) {
+                    console.error("Gửi email thông báo thất bại:", funcError.message);
+                }
+            });
 
         } catch (error: any) {
             dismissToast(loadingToast);
@@ -135,18 +157,60 @@ const QuizPage = () => {
                     <CardContent className="space-y-8 py-6">
                         <div className="space-y-4 p-6 border rounded-lg">
                             <h3 className="text-xl font-semibold">Thông tin cá nhân</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="fullName">Họ và tên</Label>
                                     <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nguyễn Văn A" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="dob">Ngày sinh</Label>
-                                    <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} required />
-                                </div>
-                                <div className="space-y-2">
                                     <Label htmlFor="phone">Số điện thoại</Label>
                                     <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Ngày sinh</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full justify-start text-left font-normal",
+                                                    !dob && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {dob ? format(dob, "PPP", { locale: vi }) : <span>Chọn ngày</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={dob}
+                                                onSelect={setDob}
+                                                initialFocus
+                                                captionLayout="dropdown-buttons"
+                                                fromYear={1950}
+                                                toYear={new Date().getFullYear()}
+                                                locale={vi}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Giới tính</Label>
+                                    <RadioGroup value={gender} onValueChange={setGender} className="flex items-center space-x-4 pt-2">
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Nam" id="gender-male" />
+                                            <Label htmlFor="gender-male">Nam</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Nữ" id="gender-female" />
+                                            <Label htmlFor="gender-female">Nữ</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Khác" id="gender-other" />
+                                            <Label htmlFor="gender-other">Khác</Label>
+                                        </div>
+                                    </RadioGroup>
                                 </div>
                             </div>
                         </div>
