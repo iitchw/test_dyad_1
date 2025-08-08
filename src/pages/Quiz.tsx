@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -104,8 +105,11 @@ const QuizPage = () => {
                         <p className="text-lg mb-4">Họ và tên: {fullName}</p>
                         <p className="text-5xl font-bold mb-6">Điểm của bạn: {score.toFixed(1)} / 10</p>
                     </CardContent>
-                    <CardFooter className="flex justify-center">
+                    <CardFooter className="flex justify-center gap-4">
                         <Button onClick={resetQuiz}>Làm lại bài kiểm tra</Button>
+                        <Link to="/">
+                            <Button variant="outline">Về trang chủ</Button>
+                        </Link>
                     </CardFooter>
                 </Card>
                 <MadeWithDyad />
