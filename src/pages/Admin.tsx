@@ -8,6 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { QuizResultDetail } from "@/components/QuizResultDetail";
+import * as XLSX from 'xlsx';
+import { quizQuestions } from "@/lib/quizData";
+import { Download } from "lucide-react";
 
 interface QuizResult {
   id: string;
@@ -81,16 +84,56 @@ const AdminPage = () => {
     }
   };
 
+  const handleExport = () => {
+    const statusMapping = {
+      pending: 'Chờ xem xét',
+      approved: 'Đã duyệt',
+      redo_required: 'Yêu cầu làm lại'
+    };
+
+    const dataToExport = results.map(result => {
+      const answersData: { [key: string]: string } = {};
+      quizQuestions.forEach((q, index) => {
+        const userAnswer = result.answers[q.id] || 'N/A';
+        const isCorrect = userAnswer === q.correctAnswer;
+        answersData[`Câu ${index + 1}`] = userAnswer;
+        answersData[`Câu ${index + 1} (Kết quả)`] = isCorrect ? 'Đúng' : 'Sai';
+      });
+
+      return {
+        'Họ và tên': result.full_name,
+        'Ngày sinh': new Date(result.date_of_birth).toLocaleDateString('vi-VN'),
+        'Giới tính': result.gender,
+        'Số điện thoại': result.phone_number,
+        'Điểm': result.score,
+        'Trạng thái': statusMapping[result.status],
+        'Ngày làm bài': new Date(result.created_at).toLocaleString('vi-VN'),
+        ...answersData
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Kết quả kiểm tra');
+    XLSX.writeFile(workbook, 'KetQuaKiemTra.xlsx');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 flex flex-col items-center">
-      <div className="w-full max-w-6xl mx-auto space-y-8">
+      <div className="w-full max-w-7xl mx-auto space-y-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Quản lý bài kiểm tra</CardTitle>
               <CardDescription>Danh sách tất cả các bài kiểm tra đã được hoàn thành.</CardDescription>
             </div>
-            <Button onClick={handleLogout} variant="outline">Đăng xuất</Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleExport} variant="outline" disabled={results.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Xuất ra Excel
+              </Button>
+              <Button onClick={handleLogout} variant="outline">Đăng xuất</Button>
+            </div>
           </CardHeader>
           <CardContent>
             {error && <p className="text-red-500 text-center">{error}</p>}
