@@ -5,8 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { quizQuestions } from "@/lib/quizData";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { CheckCircle2, XCircle, Printer } from "lucide-react";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+import { generatePdfFromElement } from "@/lib/pdfGenerator";
 
 interface QuizResult {
   id: string;
@@ -51,53 +50,11 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
 
   const handlePrint = () => {
     const printArea = document.getElementById('quiz-result-printable-area');
-    if (!printArea) {
+    if (printArea) {
+      generatePdfFromElement(printArea, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`);
+    } else {
       showError("Không thể tìm thấy nội dung để in.");
-      return;
     }
-
-    const loadingToast = showLoading("Đang tạo file PDF...");
-
-    html2canvas(printArea, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      const ratio = imgWidth / imgHeight;
-      
-      const pdfImgWidth = pageWidth;
-      const pdfImgHeight = pdfImgWidth / ratio;
-      
-      let heightLeft = pdfImgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = -heightLeft;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      dismissToast(loadingToast);
-      pdf.save(`KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}.pdf`);
-      showSuccess("Đã tạo file PDF thành công!");
-    }).catch(err => {
-      dismissToast(loadingToast);
-      showError("Đã xảy ra lỗi khi tạo PDF.");
-      console.error("html2canvas error:", err);
-    });
   };
 
   return (
