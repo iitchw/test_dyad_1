@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { quizQuestions } from "@/lib/quizData";
+import { robotoBase64 } from "@/lib/fonts/Roboto-Regular-base64";
 
 interface QuizResult {
   id: string;
@@ -17,18 +18,12 @@ export const generateQuizPdf = (result: QuizResult) => {
   const doc = new jsPDF();
   let y = 20; // Initial Y position
 
-  // --- QUAN TRỌNG: Để hỗ trợ đầy đủ ký tự tiếng Việt, bạn cần nhúng một font tùy chỉnh. ---
-  // 1. Lấy một file font .ttf có hỗ trợ tiếng Việt (ví dụ: Noto Sans, Roboto).
-  // 2. Chuyển đổi file .ttf đó thành chuỗi base64. Bạn có thể dùng các công cụ trực tuyến
-  //    hoặc công cụ fontconverter của jspdf (ví dụ: https://raw.githack.com/MrRio/jsPDF/master/fontconverter/fontconverter.html).
-  // 3. Thêm font vào Hệ thống File ảo (VFS) của jsPDF và đăng ký nó:
-  //    const FONT_BASE64 = "CHUỖI_FONT_BASE64_CỦA_BẠN_Ở_ĐÂY";
-  //    doc.addFileToVFS('MyVietnameseFont.ttf', FONT_BASE64);
-  //    doc.addFont('MyVietnameseFont.ttf', 'MyVietnameseFont', 'normal');
-  // 4. Sau đó, đặt font: doc.setFont('MyVietnameseFont');
-  // Hiện tại, chúng tôi đang sử dụng một font mặc định có thể không hỗ trợ đầy đủ ký tự tiếng Việt để tránh lỗi.
-  doc.setFont("helvetica"); // Sử dụng font tích hợp để ngăn lỗi 'widths'
-  // ---------------------------------------------------------------------------------------
+  // Add the custom font to the virtual file system
+  doc.addFileToVFS('Roboto-Regular.ttf', robotoBase64);
+  // Add the font to jsPDF
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+  // Set the font for the entire document
+  doc.setFont('Roboto');
 
   // Tiêu đề
   doc.setFontSize(20);
@@ -69,24 +64,29 @@ export const generateQuizPdf = (result: QuizResult) => {
     const userAnswer = result.answers[q.id];
     const isCorrect = userAnswer === q.correctAnswer;
 
-    // Kiểm tra nếu cần trang mới
-    if (y + 50 > doc.internal.pageSize.height - 20) { // Ước tính không gian cần cho một câu hỏi
+    // Split long questions to fit the page width
+    const questionLines = doc.splitTextToSize(`Câu ${index + 1}: ${q.question}`, 170);
+    
+    // Check if new page is needed
+    const questionBlockHeight = (questionLines.length + Object.keys(q.options).length + 3) * 7;
+    if (y + questionBlockHeight > doc.internal.pageSize.height - 20) {
       doc.addPage();
       y = 20;
-      doc.setFont("helvetica"); // Đặt lại font sau khi thêm trang
+      doc.setFont('Roboto'); // Reset font after adding page
       doc.setFontSize(12);
     }
 
-    doc.text(`Câu ${index + 1}: ${q.question}`, 20, y);
-    y += 7;
+    doc.text(questionLines, 20, y);
+    y += questionLines.length * 7;
 
     Object.entries(q.options).forEach(([key, value]) => {
+      const optionLines = doc.splitTextToSize(`${key}. ${value}`, 165);
       let optionText = `${key}. ${value}`;
       if (key === q.correctAnswer) {
         optionText += " (Đáp án đúng)";
       }
-      doc.text(optionText, 25, y);
-      y += 7;
+      doc.text(doc.splitTextToSize(optionText, 165), 25, y);
+      y += doc.splitTextToSize(optionText, 165).length * 7;
     });
 
     doc.text(`Bạn đã chọn: ${userAnswer || "Không trả lời"}`, 25, y);
