@@ -59,34 +59,35 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
     const loadingToast = showLoading("Đang tạo file PDF...");
 
     html2canvas(printArea, {
-      scale: 2, // Higher resolution for better quality
+      scale: 2,
       useCORS: true,
-      backgroundColor: '#ffffff', // Explicitly set background to white
+      backgroundColor: '#ffffff',
     }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const ratio = imgWidth / imgHeight;
+      
+      const pdfImgWidth = pageWidth;
+      const pdfImgHeight = pdfImgWidth / ratio;
+      
+      let heightLeft = pdfImgHeight;
+      let position = 0;
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const pdfImageHeight = (pdfWidth - 20) / ratio; // A4 width is 210mm, with 10mm margin each side
-
-      let heightLeft = pdfImageHeight;
-      let position = 10; // Top margin
-
-      pdf.addImage(imgData, 'PNG', 10, position, pdfWidth - 20, pdfImageHeight);
-      heightLeft -= (pdf.internal.pageSize.getHeight() - 20);
+      pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
+      heightLeft -= pageHeight;
 
       while (heightLeft > 0) {
-        position = -heightLeft - 10;
+        position = -heightLeft;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, pdfWidth - 20, pdfImageHeight);
-        heightLeft -= (pdf.internal.pageSize.getHeight() - 20);
+        pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
+        heightLeft -= pageHeight;
       }
       
       dismissToast(loadingToast);
