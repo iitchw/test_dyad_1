@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { quizQuestions } from "@/lib/quizData";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { CheckCircle2, XCircle, Printer } from "lucide-react";
+import { generateQuizPdf } from "@/utils/pdfGenerator"; // Import the new utility
 
 interface QuizResult {
   id: string;
@@ -48,12 +49,12 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
   };
 
   const handlePrint = () => {
-    window.print();
+    generateQuizPdf(result); // Call the new PDF generation utility
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl" id="printable-quiz-result">
+      <DialogContent className="max-w-3xl"> {/* Removed id="printable-quiz-result" */}
         <DialogHeader>
           <DialogTitle>Chi tiết bài kiểm tra của: {result.full_name}</DialogTitle>
           <DialogDescription asChild>
@@ -94,7 +95,7 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
             })}
           </div>
         </ScrollArea>
-        <DialogFooter className="pt-4 no-print">
+        <DialogFooter className="pt-4"> {/* Removed no-print */}
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             In kết quả

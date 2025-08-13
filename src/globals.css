@@ -101,52 +101,5 @@
 }
 
 @layer utilities {
-  @media print {
-    body * {
-      visibility: hidden;
-    }
-
-    #printable-quiz-result, #printable-quiz-result * {
-      visibility: visible;
-    }
-
-    #printable-quiz-result {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: auto;
-      margin: 0;
-      padding: 1.5rem;
-      border: none !important;
-      box-shadow: none !important;
-    }
-    
-    [data-radix-dialog-overlay] {
-        display: none;
-    }
-
-    [data-radix-dialog-content] {
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        max-height: none !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
-
-    [data-radix-scroll-area-viewport] {
-        height: auto !important;
-        max-height: none !important;
-        overflow: visible !important;
-    }
-
-    .no-print {
-      display: none !important;
-    }
-
-    .break-inside-avoid {
-        break-inside: avoid;
-    }
-  }
+  /* Removed @media print rules as they are no longer needed for jspdf generation */
 }
