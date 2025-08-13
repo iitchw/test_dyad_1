@@ -1,31 +1,12 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import QuizPage from "./pages/Quiz";
-import AdminPage from "./pages/Admin";
-
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/quiz" element={<QuizPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <div style={{ padding: '4rem', textAlign: 'center', fontFamily: 'sans-serif', color: '#111' }}>
+      <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Ứng dụng đang chạy</h1>
+      <p style={{ fontSize: '1.2rem', marginTop: '1rem' }}>
+        Đây là một trang kiểm tra. Vui lòng xác nhận bạn có thấy nội dung này không.
+      </p>
+    </div>
+  );
+};
 
 export default App;
