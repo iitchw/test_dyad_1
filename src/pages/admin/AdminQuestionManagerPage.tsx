@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { PlusCircle, Upload, Download } from "lucide-react";
+import { PlusCircle, Upload, Download, Edit, Trash2 } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 // Types
 interface Question {
   id: string;
+  session_id: string;
   question_text: string;
   options: { [key: string]: string };
   correct_answer: string;
@@ -43,6 +44,22 @@ const AdminQuestionManagerPage = () => {
     optionD: "",
     correct: "A",
   });
+
+  // State for edit question dialog
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editedQuestionData, setEditedQuestionData] = useState({
+    text: "",
+    optionA: "",
+    optionB: "",
+    optionC: "",
+    optionD: "",
+    correct: "A",
+  });
+
+  // State for delete confirmation dialog
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -107,6 +124,78 @@ const AdminQuestionManagerPage = () => {
       setQuestions([...questions, data[0]]);
       setIsAddDialogOpen(false);
       setNewQuestion({ text: "", optionA: "", optionB: "", optionC: "", optionD: "", correct: "A" });
+    }
+  };
+
+  const handleEditClick = (question: Question) => {
+    setEditingQuestion(question);
+    setEditedQuestionData({
+      text: question.question_text,
+      optionA: question.options.A,
+      optionB: question.options.B,
+      optionC: question.options.C,
+      optionD: question.options.D,
+      correct: question.correct_answer,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditQuestion = async () => {
+    if (!editingQuestion) return;
+    const { text, optionA, optionB, optionC, optionD, correct } = editedQuestionData;
+    if (!text || !optionA || !optionB || !optionC || !optionD) {
+      showError("Vui lòng điền đầy đủ thông tin câu hỏi.");
+      return;
+    }
+
+    const updatedData = {
+      question_text: text,
+      options: { A: optionA, B: optionB, C: optionC, D: optionD },
+      correct_answer: correct,
+    };
+
+    const loadingToast = showLoading("Đang cập nhật câu hỏi...");
+    const { data, error } = await supabase
+      .from("questions")
+      .update(updatedData)
+      .eq("id", editingQuestion.id)
+      .select();
+    dismissToast(loadingToast);
+
+    if (error) {
+      showError("Cập nhật câu hỏi thất bại.");
+      console.error(error);
+    } else {
+      showSuccess("Cập nhật câu hỏi thành công.");
+      setQuestions(questions.map(q => (q.id === editingQuestion.id ? data[0] : q)));
+      setIsEditDialogOpen(false);
+      setEditingQuestion(null);
+    }
+  };
+
+  const handleDeleteClick = (questionId: string) => {
+    setDeletingQuestionId(questionId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteQuestion = async () => {
+    if (!deletingQuestionId) return;
+
+    const loadingToast = showLoading("Đang xóa câu hỏi...");
+    const { error } = await supabase
+      .from("questions")
+      .delete()
+      .eq("id", deletingQuestionId);
+    dismissToast(loadingToast);
+
+    if (error) {
+      showError("Xóa câu hỏi thất bại.");
+      console.error(error);
+    } else {
+      showSuccess("Xóa câu hỏi thành công.");
+      setQuestions(questions.filter(q => q.id !== deletingQuestionId));
+      setIsDeleteDialogOpen(false);
+      setDeletingQuestionId(null);
     }
   };
 
@@ -256,21 +345,30 @@ const AdminQuestionManagerPage = () => {
                   <TableRow>
                     <TableHead className="w-[50%]">Câu hỏi</TableHead>
                     <TableHead>Đáp án đúng</TableHead>
+                    <TableHead className="text-right">Hành động</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={2} className="text-center">Đang tải...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center">Đang tải...</TableCell></TableRow>
                   ) : questions.length > 0 ? (
                     questions.map((q) => (
                       <TableRow key={q.id}>
                         <TableCell className="font-medium whitespace-pre-wrap">{q.question_text}</TableCell>
                         <TableCell>{q.correct_answer}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" className="mr-2" onClick={() => handleEditClick(q)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(q.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center">Chưa có câu hỏi nào.</TableCell>
+                      <TableCell colSpan={3} className="text-center">Chưa có câu hỏi nào.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -281,6 +379,57 @@ const AdminQuestionManagerPage = () => {
         <Button variant="link" onClick={() => navigate('/admin/sessions')} className="mt-4">
           &larr; Quay lại danh sách
         </Button>
+
+        {/* Edit Question Dialog */}
+        {editingQuestion && (
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader><DialogTitle>Chỉnh sửa câu hỏi</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-4">
+                <Label htmlFor="edit-q-text">Nội dung câu hỏi</Label>
+                <Input id="edit-q-text" value={editedQuestionData.text} onChange={e => setEditedQuestionData({...editedQuestionData, text: e.target.value})} />
+                <Label htmlFor="edit-q-a">Đáp án A</Label>
+                <Input id="edit-q-a" value={editedQuestionData.optionA} onChange={e => setEditedQuestionData({...editedQuestionData, optionA: e.target.value})} />
+                <Label htmlFor="edit-q-b">Đáp án B</Label>
+                <Input id="edit-q-b" value={editedQuestionData.optionB} onChange={e => setEditedQuestionData({...editedQuestionData, optionB: e.target.value})} />
+                <Label htmlFor="edit-q-c">Đáp án C</Label>
+                <Input id="edit-q-c" value={editedQuestionData.optionC} onChange={e => setEditedQuestionData({...editedQuestionData, optionC: e.target.value})} />
+                <Label htmlFor="edit-q-d">Đáp án D</Label>
+                <Input id="edit-q-d" value={editedQuestionData.optionD} onChange={e => setEditedQuestionData({...editedQuestionData, optionD: e.target.value})} />
+                <Label htmlFor="edit-q-correct">Đáp án đúng</Label>
+                <Select value={editedQuestionData.correct} onValueChange={val => setEditedQuestionData({...editedQuestionData, correct: val})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="B">B</SelectItem>
+                    <SelectItem value="C">C</SelectItem>
+                    <SelectItem value="D">D</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy</Button>
+                <Button onClick={handleEditQuestion}>Lưu thay đổi</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Xác nhận xóa</DialogTitle>
+              <DialogDescription>
+                Bạn có chắc chắn muốn xóa câu hỏi này không? Hành động này không thể hoàn tác.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Hủy</Button>
+              <Button variant="destructive" onClick={handleDeleteQuestion}>Xóa</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
