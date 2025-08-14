@@ -49,12 +49,70 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
   };
 
   const handlePrint = () => {
-    const printArea = document.getElementById('quiz-result-printable-area');
-    if (printArea) {
-      generatePdfFromElement(printArea, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`);
-    } else {
-      showError("Không thể tìm thấy nội dung để in.");
-    }
+    // Create a container for printing
+    const printContainer = document.createElement('div');
+    printContainer.id = 'temp-print-area';
+    printContainer.style.position = 'absolute';
+    printContainer.style.left = '-9999px';
+    printContainer.style.width = '800px';
+    printContainer.style.padding = '20px';
+    printContainer.style.fontFamily = 'sans-serif';
+    printContainer.style.color = 'black';
+    printContainer.style.backgroundColor = 'white';
+
+    let content = `
+      <div style="text-align: center; margin-bottom: 32px;">
+        <h2 style="font-size: 24px; font-weight: bold;">KẾT QUẢ BÀI KIỂM TRA</h2>
+        <p style="color: #555;">Thông tư 07/2014/TT-BYT</p>
+      </div>
+      <div style="margin-bottom: 32px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Thông tin cá nhân</h3>
+        <p><strong>Họ và tên:</strong> ${result.full_name}</p>
+        <p><strong>Ngày sinh:</strong> ${new Date(result.date_of_birth).toLocaleDateString('vi-VN')}</p>
+        <p><strong>Giới tính:</strong> ${result.gender}</p>
+        <p><strong>Ngày làm bài:</strong> ${new Date(result.created_at).toLocaleString('vi-VN')}</p>
+        <p style="font-size: 20px; font-weight: bold; margin-top: 8px;"><strong>Điểm số:</strong> ${result.score.toFixed(1)}/10</p>
+      </div>
+      <div>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Câu hỏi và đáp án</h3>
+    `;
+
+    quizQuestions.forEach((q, index) => {
+      const userAnswer = result.answers[q.id];
+      const isCorrect = userAnswer === q.correctAnswer;
+      
+      let optionsHtml = '';
+      Object.entries(q.options).forEach(([key, value]) => {
+        let optionStyle = 'padding: 4px; border-radius: 4px;';
+        if (userAnswer === key) {
+            optionStyle += isCorrect ? ' background-color: #e6fffa;' : ' background-color: #ffebee;';
+        }
+        if (key === q.correctAnswer) {
+            optionStyle += ' font-weight: bold; color: #2f855a;';
+        }
+        optionsHtml += `<div style="${optionStyle}">${key}. ${value}</div>`;
+      });
+
+      content += `
+        <div style="padding: 16px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 16px; page-break-inside: avoid;">
+          <p style="font-weight: 600; margin-bottom: 8px;">Câu ${index + 1}: ${q.question}</p>
+          <div style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px;">${optionsHtml}</div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 8px 0;" />
+          <p>Bạn đã chọn: <strong>${userAnswer || "Không trả lời"}</strong> ${isCorrect ? '<span style="color: green; font-weight: bold;">✔ Đúng</span>' : '<span style="color: red; font-weight: bold;">❌ Sai</span>'}</p>
+          <p>Đáp án đúng: <strong style="color: #2f855a;">${q.correctAnswer}</strong></p>
+        </div>
+      `;
+    });
+
+    content += `</div>`;
+    printContainer.innerHTML = content;
+
+    document.body.appendChild(printContainer);
+
+    generatePdfFromElement(printContainer, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`)
+      .finally(() => {
+        document.body.removeChild(printContainer);
+      });
   };
 
   return (
@@ -67,7 +125,7 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[60vh] border rounded-md">
-          <div id="quiz-result-printable-area" className="p-6 bg-white">
+          <div className="p-6 bg-white">
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-black">KẾT QUẢ BÀI KIỂM TRA</h2>
                 <p className="text-gray-600">Thông tư 07/2014/TT-BYT</p>
