@@ -139,26 +139,59 @@ const AdminResultsPage = () => {
     }
   };
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     if (results.length === 0) {
       showError("Không có dữ liệu để xuất.");
       return;
     }
-    const dataToExport = results.map(r => ({
-      "Họ và tên": r.full_name,
-      "Ngày sinh": format(new Date(r.date_of_birth), "dd/MM/yyyy"),
-      "Số điện thoại": r.phone_number,
-      "Giới tính": r.gender,
-      "Nơi công tác": r.workplace,
-      "Điểm": r.score,
-      "Trạng thái": r.status,
-      "Thời gian nộp": format(new Date(r.created_at), "dd/MM/yyyy HH:mm"),
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả");
-    const sessionName = quizSessions.find(s => s.id === selectedSessionId)?.name || "session";
-    XLSX.writeFile(workbook, `KetQua_${sessionName.replace(/\s/g, '_')}.xlsx`);
+
+    const loadingToast = showLoading("Đang chuẩn bị dữ liệu để xuất...");
+
+    try {
+      const { data: questions, error: questionsError } = await supabase
+        .from("questions")
+        .select("id, question_text, options")
+        .eq("session_id", selectedSessionId!)
+        .order("created_at", { ascending: true });
+
+      if (questionsError) throw questionsError;
+
+      const dataToExport = results.map(r => {
+        const baseData: { [key: string]: any } = {
+          "Họ và tên": r.full_name,
+          "Ngày sinh": format(new Date(r.date_of_birth), "dd/MM/yyyy"),
+          "Số điện thoại": r.phone_number,
+          "Giới tính": r.gender,
+          "Nơi công tác": r.workplace,
+          "Điểm": r.score,
+          "Trạng thái": r.status,
+          "Thời gian nộp": format(new Date(r.created_at), "dd/MM/yyyy HH:mm"),
+        };
+
+        questions.forEach((q, index) => {
+          const userAnswerKey = r.answers[q.id];
+          const userAnswerText = userAnswerKey ? `${userAnswerKey}. ${q.options[userAnswerKey]}` : "Không trả lời";
+          baseData[`Câu ${index + 1}`] = q.question_text;
+          baseData[`Trả lời câu ${index + 1}`] = userAnswerText;
+        });
+
+        return baseData;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả");
+      const sessionName = quizSessions.find(s => s.id === selectedSessionId)?.name || "session";
+      XLSX.writeFile(workbook, `KetQua_${sessionName.replace(/\s/g, '_')}.xlsx`);
+      
+      dismissToast(loadingToast);
+      showSuccess("Xuất file Excel thành công!");
+
+    } catch (error) {
+      dismissToast(loadingToast);
+      showError("Đã xảy ra lỗi khi xuất file Excel.");
+      console.error("Export error:", error);
+    }
   };
 
   const handleStatusUpdate = (resultId: string, newStatus: 'approved' | 'redo_required') => {
