@@ -1,24 +1,4 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { CheckCircle2, XCircle, Printer } from "lucide-react";
-import { generatePdfFromQuizResult } from "@/lib/pdfGenerator";
-
-interface QuizResult {
-  id: string;
-  created_at: string;
-  full_name: string;
-  date_of_birth: string;
-  phone_number: string;
-  gender: string;
-  score: number;
-  status: 'pending' | 'approved' | 'redo_required';
-  answers: { [key: string]: string };
-  session_id: string; // Important for fetching questions
-}
+import { Badge } from "@/components/ui/badge";
 
 interface Question {
   id: string;
@@ -27,124 +7,102 @@ interface Question {
   correct_answer: string;
 }
 
-interface Props {
-  result: QuizResult;
-  isOpen: boolean;
-  onClose: () => void;
-  onStatusUpdate: (resultId: string, newStatus: 'approved' | 'redo_required') => void;
+interface Result {
+  id: string;
+  full_name: string;
+  date_of_birth: string;
+  phone_number: string;
+  gender: string | null;
+  score: number | null;
+  status: string;
+  answers: { [key: string]: string };
+  quiz_sessions: {
+    name: string;
+  } | null;
 }
 
-export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Props) => {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loadingQuestions, setLoadingQuestions] = useState(true);
+interface QuizResultDetailProps {
+  result: Result;
+  questions: Question[];
+}
 
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      if (!isOpen || !result.session_id) return;
-      setLoadingQuestions(true);
-      const { data, error } = await supabase
-        .from("questions")
-        .select("*")
-        .eq("session_id", result.session_id);
-      
-      if (error) {
-        showError("Không thể tải bộ câu hỏi cho bài làm này.");
-      } else {
-        setQuestions(data || []);
-      }
-      setLoadingQuestions(false);
-    };
-    fetchQuestions();
-  }, [isOpen, result.session_id]);
+const QuizResultDetail = ({ result, questions }: QuizResultDetailProps) => {
+  if (!result) return null;
 
-  const handleStatusUpdate = async (newStatus: 'approved' | 'redo_required') => {
-    const loadingToast = showLoading("Đang cập nhật trạng thái...");
-    try {
-      const { error } = await supabase
-        .from("quiz_results")
-        .update({ status: newStatus })
-        .eq("id", result.id);
-
-      dismissToast(loadingToast);
-      if (error) throw error;
-
-      showSuccess("Cập nhật trạng thái thành công!");
-      onStatusUpdate(result.id, newStatus);
-      onClose();
-    } catch (error) {
-      dismissToast(loadingToast);
-      showError("Cập nhật trạng thái thất bại.");
-      console.error("Error updating status:", error);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "passed":
+        return <Badge variant="default" className="bg-green-500">Đạt</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Không đạt</Badge>;
+      default:
+        return <Badge variant="secondary">Chưa có</Badge>;
     }
   };
 
-  const handlePrint = () => {
-    const resultWithQuestions = { ...result, questions };
-    generatePdfFromQuizResult(resultWithQuestions, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`);
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return dateString;
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Chi tiết bài kiểm tra của: {result.full_name}</DialogTitle>
-          <DialogDescription>
-            Xem lại câu trả lời và kết quả chi tiết dưới đây.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="h-[60vh] border rounded-md">
-          <div className="p-6 bg-white">
-            <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-black">KẾT QUẢ BÀI KIỂM TRA</h2>
-            </div>
-            <div className="mb-8 space-y-2 text-black">
-                <h3 className="text-lg font-semibold">Thông tin cá nhân</h3>
-                <p><strong>Họ và tên:</strong> {result.full_name}</p>
-                <p><strong>Ngày sinh:</strong> {new Date(result.date_of_birth).toLocaleDateString('vi-VN')}</p>
-                <p><strong>Giới tính:</strong> {result.gender}</p>
-                <p><strong>Ngày làm bài:</strong> {new Date(result.created_at).toLocaleString('vi-VN')}</p>
-                <p className="text-xl font-bold"><strong>Điểm số:</strong> {result.score.toFixed(1)}/10</p>
-            </div>
-            
-            <div className="space-y-6 text-black">
-              <h3 className="text-lg font-semibold">Câu hỏi và đáp án</h3>
-              {loadingQuestions ? <p>Đang tải câu hỏi...</p> : questions.map((q, index) => {
-                const userAnswer = result.answers[q.id];
-                const isCorrect = userAnswer === q.correct_answer;
-                return (
-                  <div key={q.id} className="p-4 border rounded-lg break-inside-avoid">
-                    <p className="font-semibold mb-2">{`Câu ${index + 1}: ${q.question_text}`}</p>
-                    <div className="space-y-2">
-                      {Object.entries(q.options).map(([key, value]) => (
-                        <div key={key} className={`flex items-center space-x-3 p-2 rounded-md ${userAnswer === key ? (isCorrect ? 'bg-green-100' : 'bg-red-100') : ''}`}>
-                          {userAnswer === key ? (
-                            isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />
-                          ) : (
-                            <div className="h-5 w-5" />
-                          )}
-                          <span className={`${key === q.correct_answer ? 'font-bold text-green-700' : ''}`}>{`${key}. ${value}`}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-2 text-sm">
-                      <p>Bạn đã chọn: <span className="font-bold">{userAnswer || "Không trả lời"}</span></p>
-                      <p>Đáp án đúng: <span className="font-bold text-green-700">{q.correct_answer}</span></p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </ScrollArea>
-        <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={handlePrint} disabled={loadingQuestions}>
-            <Printer className="mr-2 h-4 w-4" />
-            In ra PDF
-          </Button>
-          <Button variant="outline" onClick={() => handleStatusUpdate('redo_required')}>Yêu cầu làm lại</Button>
-          <Button onClick={() => handleStatusUpdate('approved')}>Phê duyệt kết quả</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="p-6 bg-white rounded-lg max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-black">KẾT QUẢ BÀI KIỂM TRA</h2>
+        {result.quiz_sessions?.name && (
+          <p className="text-xl text-gray-700 mt-2">
+            Đợt kiểm tra: <span className="font-semibold">{result.quiz_sessions.name}</span>
+          </p>
+        )}
+      </div>
+      <div className="mb-8 space-y-2 text-black">
+        <h3 className="text-lg font-semibold">Thông tin cá nhân</h3>
+        <p><strong>Họ và tên:</strong> {result.full_name}</p>
+        <p><strong>Ngày sinh:</strong> {formatDate(result.date_of_birth)}</p>
+        <p><strong>Số điện thoại:</strong> {result.phone_number}</p>
+        <p><strong>Giới tính:</strong> {result.gender === 'male' ? 'Nam' : result.gender === 'female' ? 'Nữ' : 'Khác'}</p>
+      </div>
+      <div className="mb-8 space-y-2 text-black">
+        <h3 className="text-lg font-semibold">Kết quả</h3>
+        <p><strong>Điểm số:</strong> {result.score !== null ? `${result.score}/${questions.length}` : "Chưa có"}</p>
+        <p><strong>Trạng thái:</strong> {getStatusBadge(result.status)}</p>
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-black">Chi tiết câu trả lời</h3>
+        <div className="space-y-6">
+          {questions.map((question, index) => {
+            const userAnswerKey = result.answers?.[question.id];
+            const userAnswerText = userAnswerKey ? question.options[userAnswerKey] : "Chưa trả lời";
+            const isCorrect = userAnswerKey === question.correct_answer;
+            const correctAnswerText = question.options[question.correct_answer];
+
+            return (
+              <div key={question.id} className="p-4 border rounded-md bg-gray-50">
+                <p className="font-semibold text-black">Câu {index + 1}: {question.question_text}</p>
+                <div className="mt-2 space-y-1">
+                  <p className={`text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                    <strong>Câu trả lời của bạn:</strong> {userAnswerKey ? `${userAnswerKey}. ${userAnswerText}`: 'Chưa trả lời'}
+                  </p>
+                  {!isCorrect && (
+                    <p className="text-sm text-blue-600">
+                      <strong>Đáp án đúng:</strong> {question.correct_answer}. {correctAnswerText}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 };
+
+export default QuizResultDetail;
