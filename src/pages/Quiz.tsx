@@ -12,12 +12,14 @@ import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { shuffleArray } from "@/lib/utils";
 
 interface Question {
   id: string;
   question_text: string;
   options: { [key: string]: string };
   correct_answer: string;
+  shuffledOptions?: [string, string][];
 }
 
 interface QuizSession {
@@ -25,16 +27,6 @@ interface QuizSession {
   name: string;
   questions: Question[];
 }
-
-// Helper function to shuffle an array
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
 
 const QuizPage = () => {
     const { sessionId } = useParams();
@@ -80,13 +72,11 @@ const QuizPage = () => {
           
           if (questionsError) throw new Error("Không thể tải câu hỏi.");
 
-          // Shuffle questions and their options
-          const shuffledQuestions = shuffleArray(questionsData || []).map(question => {
-            const optionsEntries = Object.entries(question.options);
-            const shuffledOptionsEntries = shuffleArray(optionsEntries);
-            const shuffledOptions = Object.fromEntries(shuffledOptionsEntries);
-            return { ...question, options: shuffledOptions };
-          });
+          const processedQuestions = (questionsData || []).map(q => ({
+            ...q,
+            shuffledOptions: shuffleArray(Object.entries(q.options))
+          }));
+          const shuffledQuestions = shuffleArray(processedQuestions);
 
           setSession({ ...sessionData, questions: shuffledQuestions });
         } catch (err: any) {
@@ -331,7 +321,7 @@ const QuizPage = () => {
                                 <div key={q.id} className="p-4 border rounded-lg">
                                     <p className="font-medium mb-4">{`Câu ${index + 1}: ${q.question_text}`}</p>
                                     <RadioGroup value={answers[q.id]} onValueChange={(value) => handleAnswerChange(q.id, value)}>
-                                        {Object.entries(q.options).map(([key, value]) => (
+                                        {(q.shuffledOptions || Object.entries(q.options)).map(([key, value]) => (
                                             <div key={key} className="flex items-center space-x-2">
                                                 <RadioGroupItem value={key} id={`${q.id}-${key}`} />
                                                 <Label htmlFor={`${q.id}-${key}`}>{`${key}. ${value}`}</Label>
