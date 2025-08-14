@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface Question {
@@ -23,9 +22,7 @@ const Quiz = () => {
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
     const [fullName, setFullName] = useState("");
     const [dob, setDob] = useState("");
-    const [gender, setGender] = useState("");
     const [phone, setPhone] = useState("");
-    const [workplace, setWorkplace] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [sessionName, setSessionName] = useState("");
 
@@ -89,14 +86,12 @@ const Quiz = () => {
 
         const finalScore = (score / questions.length) * 10;
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('quiz_results')
             .insert([{
                 full_name: fullName,
                 date_of_birth: dob,
-                gender: gender,
                 phone_number: phone,
-                workplace: workplace,
                 answers: answers,
                 score: finalScore,
                 session_id: sessionId,
@@ -111,7 +106,7 @@ const Quiz = () => {
             toast.error("Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.");
         } else {
             toast.success("Nộp bài thành công!");
-            navigate(`/results/${data.id}`);
+            navigate("/sessions");
         }
     };
 
@@ -140,25 +135,8 @@ const Quiz = () => {
                                     <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="gender">Giới tính</Label>
-                                    <Select onValueChange={setGender} value={gender} required>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Chọn giới tính" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Nam">Nam</SelectItem>
-                                            <SelectItem value="Nữ">Nữ</SelectItem>
-                                            <SelectItem value="Khác">Khác</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
                                     <Label htmlFor="phone">Số điện thoại</Label>
                                     <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="workplace">Nơi công tác</Label>
-                                    <Input id="workplace" value={workplace} onChange={(e) => setWorkplace(e.target.value)} required />
                                 </div>
                             </div>
                         </div>
