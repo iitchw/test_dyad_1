@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import { showLoading, dismissToast, showError, showSuccess } from "@/utils/toast";
 import { quizQuestions } from "@/lib/quizData";
+// Import the font file
+import './fonts/Roboto-VariableFont_wdth,wght-normal'; // This import registers the font with jsPDF
 
 interface QuizResult {
   id: string;
@@ -24,19 +26,10 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
       format: 'a4',
     });
 
-    // --- Font setup for Vietnamese (Limitation explanation) ---
-    // jsPDF's default fonts (Helvetica, Times, Courier) have limited Vietnamese character support.
-    // For full Vietnamese character rendering, a custom font (e.g., Arial Unicode MS, DejaVu Sans)
-    // needs to be embedded. This typically involves:
-    // 1. Converting a .ttf font file to a .js file using tools like jsPDF's fontconverter.
-    // 2. Importing that .js file into your project.
-    // 3. Registering the font with jsPDF using doc.addFileToVFS() and doc.addFont().
-    // Example (if you had a font file converted to a JS module and registered):
-    // doc.setFont('YourCustomFontName'); // Set the font
-    // doc.setFontSize(12);
-
-    // For now, we'll use a default font and acknowledge potential rendering issues for some characters.
-    doc.setFont('Helvetica'); // Using a standard font
+    // Register and set the custom font for Vietnamese support
+    // The font is already added to VFS by the import statement if it's a jsPDF font file.
+    doc.addFont('Roboto-VariableFont_wdth,wght-normal.ttf', 'Roboto', 'normal');
+    doc.setFont('Roboto');
     doc.setTextColor(0, 0, 0); // Black color
 
     let y = 20; // Initial Y position
