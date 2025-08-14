@@ -1,7 +1,14 @@
 import { jsPDF } from "jspdf";
 import { showLoading, dismissToast, showError, showSuccess } from "@/utils/toast";
 import { quizQuestions } from "@/lib/quizData";
-// Import the font file
+
+// Đảm bảo jsPDF có sẵn trong phạm vi toàn cục (window)
+// File font .js mong đợi jsPDF là một biến toàn cục.
+if (typeof window !== 'undefined' && !window.jsPDF) {
+  window.jsPDF = jsPDF;
+}
+
+// Import file font. Giờ đây nó sẽ tìm thấy window.jsPDF.API.
 import './fonts/Roboto-VariableFont_wdth,wght-normal'; // This import registers the font with jsPDF
 
 interface QuizResult {
