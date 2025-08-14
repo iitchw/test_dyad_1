@@ -111,8 +111,6 @@ const Quiz = () => {
             toast.error("Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.");
         } else {
             toast.success("Nộp bài thành công!");
-            // This part seems to navigate to a non-existent route, but I'll leave it as is per user's codebase.
-            // A future request might be to create this results page.
             navigate(`/results/${data.id}`);
         }
     };
