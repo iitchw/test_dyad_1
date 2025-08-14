@@ -13,7 +13,7 @@ const initializePdfFont = async () => {
     // Gán jsPDF vào window để file font có thể truy cập
     window.jsPDF = jsPDF;
     // Import động file font để đảm bảo nó chạy sau khi window.jsPDF được thiết lập
-    await import('./fonts/Roboto-VariableFont_wdth,wght-normal');
+    await import('./fonts/Roboto-normal.js');
     isFontInitialized = true;
   }
 };
@@ -44,7 +44,8 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
     });
 
     // Đăng ký và thiết lập font tùy chỉnh để hỗ trợ tiếng Việt
-    doc.addFont('Roboto-VariableFont_wdth,wght-normal.ttf', 'Roboto', 'normal');
+    // Tên 'Roboto-normal.ttf' được định nghĩa bên trong file Roboto-normal.js
+    doc.addFont('Roboto-normal.ttf', 'Roboto', 'normal');
     doc.setFont('Roboto');
     doc.setTextColor(0, 0, 0); // Black color
 
