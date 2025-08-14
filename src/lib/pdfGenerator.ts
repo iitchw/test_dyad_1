@@ -2,14 +2,21 @@ import { jsPDF } from "jspdf";
 import { showLoading, dismissToast, showError, showSuccess } from "@/utils/toast";
 import { quizQuestions } from "@/lib/quizData";
 
-// Đảm bảo jsPDF có sẵn trong phạm vi toàn cục (window)
-// File font .js mong đợi jsPDF là một biến toàn cục.
-if (typeof window !== 'undefined' && !window.jsPDF) {
-  window.jsPDF = jsPDF;
-}
+// Cờ để đảm bảo font chỉ được khởi tạo một lần
+let isFontInitialized = false;
 
-// Import file font. Giờ đây nó sẽ tìm thấy window.jsPDF.API.
-import './fonts/Roboto-VariableFont_wdth,wght-normal'; // This import registers the font with jsPDF
+// Hàm khởi tạo font động
+const initializePdfFont = async () => {
+  if (isFontInitialized) return;
+
+  if (typeof window !== 'undefined') {
+    // Gán jsPDF vào window để file font có thể truy cập
+    window.jsPDF = jsPDF;
+    // Import động file font để đảm bảo nó chạy sau khi window.jsPDF được thiết lập
+    await import('./fonts/Roboto-VariableFont_wdth,wght-normal');
+    isFontInitialized = true;
+  }
+};
 
 interface QuizResult {
   id: string;
@@ -27,19 +34,21 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
   const loadingToast = showLoading("Đang tạo file PDF...");
 
   try {
+    // Đảm bảo font đã được khởi tạo
+    await initializePdfFont();
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
     });
 
-    // Register and set the custom font for Vietnamese support
-    // The font is already added to VFS by the import statement if it's a jsPDF font file.
+    // Đăng ký và thiết lập font tùy chỉnh để hỗ trợ tiếng Việt
     doc.addFont('Roboto-VariableFont_wdth,wght-normal.ttf', 'Roboto', 'normal');
     doc.setFont('Roboto');
     doc.setTextColor(0, 0, 0); // Black color
 
-    let y = 20; // Initial Y position
+    let y = 20; // Vị trí Y ban đầu
     const margin = 20;
     const lineHeight = 7;
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -79,15 +88,14 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
       const userAnswer = result.answers[q.id];
       const isCorrect = userAnswer === q.correctAnswer;
 
-      // Check for new page before drawing question
-      // Estimate space needed for a question block (question + options + answers)
+      // Kiểm tra xem có cần sang trang mới trước khi vẽ câu hỏi không
       const estimatedQuestionHeight = (doc.splitTextToSize(`Câu ${index + 1}: ${q.question}`, pageWidth - (margin * 2)).length * lineHeight) +
                                       (Object.keys(q.options).length * lineHeight * 1.5) + // Options
                                       (lineHeight * 3); // User/Correct answers + spacing
 
       if (y + estimatedQuestionHeight > pageHeight - margin) {
         doc.addPage();
-        y = margin; // Reset y for new page
+        y = margin; // Reset y cho trang mới
         doc.setFontSize(14);
         doc.text("Câu hỏi và đáp án (tiếp theo)", margin, y);
         y += lineHeight * 1.5;
@@ -101,7 +109,7 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
 
       Object.entries(q.options).forEach(([key, value]) => {
         const optionText = `${key}. ${value}`;
-        const splitOption = doc.splitTextToSize(optionText, pageWidth - (margin * 2) - 10); // Indent options
+        const splitOption = doc.splitTextToSize(optionText, pageWidth - (margin * 2) - 10); // Thụt lề các lựa chọn
         doc.text(splitOption, margin + 5, y);
         y += (splitOption.length * lineHeight);
       });
@@ -110,7 +118,7 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
       doc.text(`Bạn đã chọn: ${userAnswer || "Không trả lời"}`, margin, y);
       y += lineHeight;
       doc.text(`Đáp án đúng: ${q.correctAnswer}`, margin, y);
-      y += lineHeight * 1.5; // Space after each question
+      y += lineHeight * 1.5; // Khoảng cách sau mỗi câu hỏi
     });
 
     doc.save(`${fileName}.pdf`);
