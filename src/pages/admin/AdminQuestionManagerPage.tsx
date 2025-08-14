@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { PlusCircle, Upload } from "lucide-react";
+import { PlusCircle, Upload, Download } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 // Types
@@ -157,6 +157,42 @@ const AdminQuestionManagerPage = () => {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const sampleData = [
+      {
+        question_text: "Thủ đô của Việt Nam là gì?",
+        option_a: "Hà Nội",
+        option_b: "Đà Nẵng",
+        option_c: "TP. Hồ Chí Minh",
+        option_d: "Hải Phòng",
+        correct_answer: "A",
+      },
+      {
+        question_text: "1 + 1 bằng mấy?",
+        option_a: "1",
+        option_b: "2",
+        option_c: "3",
+        option_d: "4",
+        correct_answer: "B",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Questions");
+    
+    worksheet['!cols'] = [
+      { wch: 50 }, // question_text
+      { wch: 20 }, // option_a
+      { wch: 20 }, // option_b
+      { wch: 20 }, // option_c
+      { wch: 20 }, // option_d
+      { wch: 15 }, // correct_answer
+    ];
+
+    XLSX.writeFile(workbook, "Mau_Cau_Hoi.xlsx");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -167,6 +203,10 @@ const AdminQuestionManagerPage = () => {
               <CardDescription>Thêm, sửa, xóa và nhập câu hỏi cho đợt kiểm tra này.</CardDescription>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={handleDownloadTemplate}>
+                <Download className="mr-2 h-4 w-4" />
+                Tải file mẫu
+              </Button>
               <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="mr-2 h-4 w-4" />
                 Nhập từ Excel
