@@ -86,7 +86,6 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
 
     quizQuestions.forEach((q, index) => {
       const userAnswer = result.answers[q.id];
-      const isCorrect = userAnswer === q.correctAnswer;
 
       // Kiểm tra xem có cần sang trang mới trước khi vẽ câu hỏi không
       const estimatedQuestionHeight = (doc.splitTextToSize(`Câu ${index + 1}: ${q.question}`, pageWidth - (margin * 2)).length * lineHeight) +
