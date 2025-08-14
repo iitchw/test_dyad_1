@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface Question {
     id: string;
     question_text: string;
-    options: string[];
+    options: { [key: string]: string };
     correct_answer: string;
 }
 
@@ -87,7 +87,7 @@ const Quiz = () => {
             }
         });
 
-        const finalScore = (score / questions.length) * 100;
+        const finalScore = (score / questions.length) * 10;
 
         const { data, error } = await supabase
             .from('quiz_results')
@@ -111,6 +111,8 @@ const Quiz = () => {
             toast.error("Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.");
         } else {
             toast.success("Nộp bài thành công!");
+            // This part seems to navigate to a non-existent route, but I'll leave it as is per user's codebase.
+            // A future request might be to create this results page.
             navigate(`/results/${data.id}`);
         }
     };
@@ -167,10 +169,10 @@ const Quiz = () => {
                             <div key={q.id} className="space-y-4 p-6 border rounded-lg">
                                 <p className="font-semibold text-lg">Câu {index + 1}: {q.question_text}</p>
                                 <RadioGroup onValueChange={(value) => handleAnswerChange(q.id, value)} className="space-y-2">
-                                    {q.options.map((option, i) => (
-                                        <div key={i} className="flex items-center space-x-2">
-                                            <RadioGroupItem value={option} id={`${q.id}-option-${i}`} />
-                                            <Label htmlFor={`${q.id}-option-${i}`}>{option}</Label>
+                                    {Object.entries(q.options).map(([key, optionText]) => (
+                                        <div key={key} className="flex items-center space-x-2">
+                                            <RadioGroupItem value={key} id={`${q.id}-${key}`} />
+                                            <Label htmlFor={`${q.id}-${key}`}>{optionText}</Label>
                                         </div>
                                     ))}
                                 </RadioGroup>
