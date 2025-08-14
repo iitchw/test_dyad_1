@@ -19,7 +19,7 @@ interface Props {
 
 export const PrintableResult = React.forwardRef<HTMLDivElement, Props>(({ result }, ref) => {
   return (
-    <div ref={ref} style={{ padding: '40px', fontFamily: 'sans-serif', color: 'black', backgroundColor: 'white', width: '800px' }}>
+    <div ref={ref} style={{ padding: '40px', fontFamily: 'Arial, sans-serif', color: 'black', backgroundColor: 'white', width: '800px' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>KẾT QUẢ BÀI KIỂM TRA</h2>
         <p style={{ color: '#555', fontSize: '16px', margin: '8px 0 0 0' }}>Thông tư 07/2014/TT-BYT</p>

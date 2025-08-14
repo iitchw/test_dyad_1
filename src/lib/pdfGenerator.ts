@@ -11,11 +11,13 @@ export const generatePdfFromElement = async (element: HTMLElement, fileName: str
   const loadingToast = showLoading("Đang tạo file PDF...");
 
   try {
+    // html2canvas captures the HTML element as an image.
+    // Text within this image will not be selectable or searchable in the PDF.
+    // Font embedding in jspdf primarily affects text drawn directly by jspdf, not text within images.
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 2, // Increase scale for better resolution
       useCORS: true,
       backgroundColor: '#ffffff',
-      // Các tùy chọn này giúp html2canvas chụp lại toàn bộ nội dung có thể cuộn
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
     });
@@ -39,9 +41,12 @@ export const generatePdfFromElement = async (element: HTMLElement, fileName: str
     let heightLeft = imgHeightOnPdf;
     let position = 0;
 
+    // Add the first part of the image
     pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightOnPdf);
     heightLeft -= pdfHeight;
 
+    // Add new pages and continue drawing the image if it's taller than one page
+    // The 'position' parameter shifts the image vertically to show the next segment
     while (heightLeft > 0) {
       position = -heightLeft;
       pdf.addPage();
