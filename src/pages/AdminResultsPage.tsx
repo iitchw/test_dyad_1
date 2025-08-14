@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { QuizResultDetail } from "@/components/QuizResultDetail";
+import QuizResultDetail from "@/components/QuizResultDetail";
 import * as XLSX from 'xlsx';
 import { Download } from "lucide-react";
 
@@ -29,6 +29,7 @@ interface Question {
   id: string;
   session_id: string;
   question_text: string;
+  options: { [key: string]: string };
   correct_answer: string;
 }
 
@@ -63,7 +64,7 @@ const AdminResultsPage = () => {
 
         const { data: questionsData, error: questionsError } = await supabase
           .from("questions")
-          .select("id, session_id, question_text, correct_answer");
+          .select("id, session_id, question_text, options, correct_answer");
         
         if (questionsError) throw questionsError;
         setQuestions(questionsData || []);
