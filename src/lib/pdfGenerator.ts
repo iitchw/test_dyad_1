@@ -26,6 +26,7 @@ interface QuizResultWithQuestions {
   date_of_birth: string;
   phone_number: string;
   gender: string;
+  workplace: string;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
@@ -67,6 +68,8 @@ export const generatePdfFromQuizResult = async (result: QuizResultWithQuestions,
     doc.text(`Ngày sinh: ${new Date(result.date_of_birth).toLocaleDateString('vi-VN')}`, margin, y);
     y += lineHeight;
     doc.text(`Giới tính: ${result.gender}`, margin, y);
+    y += lineHeight;
+    doc.text(`Đơn vị công tác: ${result.workplace}`, margin, y);
     y += lineHeight;
     doc.text(`Ngày làm bài: ${new Date(result.created_at).toLocaleString('vi-VN')}`, margin, y);
     y += lineHeight * 1.5;

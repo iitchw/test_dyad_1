@@ -27,6 +27,7 @@ interface Result {
   date_of_birth: string;
   phone_number: string;
   gender: string;
+  workplace: string;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
@@ -125,6 +126,7 @@ const QuizResultDetail = ({ isOpen, onClose, result, onStatusUpdate }: QuizResul
               <p><strong>Ngày sinh:</strong> {new Date(result.date_of_birth).toLocaleDateString('vi-VN')}</p>
               <p><strong>Giới tính:</strong> {result.gender}</p>
               <p><strong>Số điện thoại:</strong> {result.phone_number}</p>
+              <p><strong>Đơn vị công tác:</strong> {result.workplace}</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Kết quả</h3>
@@ -144,7 +146,7 @@ const QuizResultDetail = ({ isOpen, onClose, result, onStatusUpdate }: QuizResul
                     <div key={q.id} className={`p-3 border rounded-md ${isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                       <p className="font-medium">Câu {index + 1}: {q.question_text}</p>
                       <div className="mt-2 space-y-1 text-sm">
-                        {Object.entries(q.options).map(([key, value]: [string, any]) => (
+                        {Object.entries(q.options).map(([key, value]) => (
                           <p key={key} className={`${
                             key === userAnswerKey ? (isCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold') : 
                             (key === q.correct_answer ? 'text-blue-700' : 'text-gray-600')

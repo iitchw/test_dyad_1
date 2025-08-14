@@ -18,6 +18,7 @@ interface QuizResult {
   date_of_birth: string;
   phone_number: string;
   gender: string;
+  workplace: string;
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
@@ -121,6 +122,7 @@ const AdminResultsPage = () => {
         'Ngày sinh': new Date(result.date_of_birth).toLocaleDateString('vi-VN'),
         'Giới tính': result.gender,
         'Số điện thoại': result.phone_number,
+        'Đơn vị công tác': result.workplace,
         'Điểm': result.score,
         'Trạng thái': statusMapping[result.status],
         'Ngày làm bài': new Date(result.created_at).toLocaleString('vi-VN'),
@@ -158,6 +160,7 @@ const AdminResultsPage = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
+                    <TableHead>Đơn vị công tác</TableHead>
                     <TableHead>Đợt kiểm tra</TableHead>
                     <TableHead>Ngày làm bài</TableHead>
                     <TableHead>Trạng thái</TableHead>
@@ -170,6 +173,7 @@ const AdminResultsPage = () => {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
@@ -179,6 +183,7 @@ const AdminResultsPage = () => {
                     results.map((result) => (
                       <TableRow key={result.id} onClick={() => setSelectedResult(result)} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium">{result.full_name}</TableCell>
+                        <TableCell>{result.workplace}</TableCell>
                         <TableCell>{result.quiz_sessions?.name || 'N/A'}</TableCell>
                         <TableCell>{new Date(result.created_at).toLocaleDateString("vi-VN")}</TableCell>
                         <TableCell>{getStatusBadge(result.status)}</TableCell>
@@ -187,7 +192,7 @@ const AdminResultsPage = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">
+                      <TableCell colSpan={6} className="text-center">
                         Chưa có kết quả nào được nộp.
                       </TableCell>
                     </TableRow>

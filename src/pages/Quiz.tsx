@@ -36,6 +36,7 @@ const QuizPage = () => {
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
     const [gender, setGender] = useState("");
+    const [workplace, setWorkplace] = useState("");
     const [dobDay, setDobDay] = useState("");
     const [dobMonth, setDobMonth] = useState("");
     const [dobYear, setDobYear] = useState("");
@@ -102,6 +103,7 @@ const QuizPage = () => {
         setFullName("");
         setPhone("");
         setGender("");
+        setWorkplace("");
         setDobDay("");
         setDobMonth("");
         setDobYear("");
@@ -114,7 +116,7 @@ const QuizPage = () => {
         e.preventDefault();
         if (!session || session.questions.length === 0) return;
 
-        if (!fullName || !dobDay || !dobMonth || !dobYear || !phone || !gender) {
+        if (!fullName || !dobDay || !dobMonth || !dobYear || !phone || !gender || !workplace) {
             showError("Vui lòng điền đầy đủ thông tin cá nhân.");
             return;
         }
@@ -149,6 +151,7 @@ const QuizPage = () => {
             date_of_birth: format(dateOfBirth, "yyyy-MM-dd"),
             phone_number: phone,
             gender: gender,
+            workplace: workplace,
             answers: answers,
             score: finalScore,
             session_id: sessionId,
@@ -262,6 +265,10 @@ const QuizPage = () => {
                                 <div className="space-y-2">
                                     <Label htmlFor="phone">Số điện thoại</Label>
                                     <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="workplace">Đơn vị công tác</Label>
+                                    <Input id="workplace" value={workplace} onChange={(e) => setWorkplace(e.target.value)} placeholder="Trạm Y tế phường Mỹ Thượng" required />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Ngày sinh</Label>
