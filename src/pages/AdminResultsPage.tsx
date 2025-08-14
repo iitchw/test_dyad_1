@@ -1,200 +1,225 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import QuizResultDetail from "@/components/QuizResultDetail";
-import * as XLSX from 'xlsx';
-import { Download } from "lucide-react";
+import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import { Eye, Trash2 } from "lucide-react";
 
 interface QuizResult {
   id: string;
-  created_at: string;
   full_name: string;
   date_of_birth: string;
   phone_number: string;
   gender: string;
   workplace: string;
-  score: number;
-  status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
+  score: number;
+  status: string;
+  created_at: string;
   session_id: string;
-  quiz_sessions: { name: string } | null;
 }
 
-interface Question {
+interface QuizSession {
   id: string;
-  session_id: string;
-  question_text: string;
-  options: { [key: string]: string };
-  correct_answer: string;
+  name: string;
 }
 
 const AdminResultsPage = () => {
+  const navigate = useNavigate();
   const [results, setResults] = useState<QuizResult[]>([]);
-  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null);
-  const navigate = useNavigate();
+  const [viewingResult, setViewingResult] = useState<QuizResult | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingResultId, setDeletingResultId] = useState<string | null>(null);
+
+  const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem("isAdminLoggedIn");
-    if (isLoggedIn !== "true") {
+    if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
       navigate("/");
+      return;
     }
+    fetchSessions();
   }, [navigate]);
 
   useEffect(() => {
-    const fetchResults = async () => {
-      if (sessionStorage.getItem("isAdminLoggedIn") !== "true") return;
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase
-          .from("quiz_results")
-          .select("*, quiz_sessions(name)")
-          .order("created_at", { ascending: false });
+    if (selectedSessionId) {
+      fetchResults(selectedSessionId);
+    } else if (quizSessions.length > 0) {
+      // Automatically select the first session if available
+      setSelectedSessionId(quizSessions[0].id);
+    }
+  }, [selectedSessionId, quizSessions]);
 
-        if (error) throw error;
-        setResults(data || []);
+  const fetchSessions = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("quiz_sessions")
+        .select("id, name")
+        .order("created_at", { ascending: false });
 
-        const { data: questionsData, error: questionsError } = await supabase
-          .from("questions")
-          .select("id, session_id, question_text, options, correct_answer");
-        
-        if (questionsError) throw questionsError;
-        setQuestions(questionsData || []);
-
-      } catch (err: any) {
-        console.error("Error fetching data:", err);
-        setError("Không thể tải kết quả. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
+      if (error) throw error;
+      setQuizSessions(data);
+      if (data.length > 0) {
+        setSelectedSessionId(data[0].id); // Select the most recent session by default
       }
-    };
-    fetchResults();
-  }, []);
-
-  const handleStatusUpdate = (resultId: string, newStatus: 'approved' | 'redo_required') => {
-    setResults(prevResults =>
-      prevResults.map(r => (r.id === resultId ? { ...r, status: newStatus } : r))
-    );
-  };
-
-  const getStatusBadge = (status: QuizResult['status']) => {
-    switch (status) {
-      case 'approved':
-        return <Badge variant="default" className="bg-green-600">Đã duyệt</Badge>;
-      case 'redo_required':
-        return <Badge variant="destructive">Yêu cầu làm lại</Badge>;
-      case 'pending':
-      default:
-        return <Badge variant="secondary">Chờ xem xét</Badge>;
+    } catch (err: any) {
+      setError("Không thể tải danh sách đợt kiểm tra: " + err.message);
+      showError("Không thể tải danh sách đợt kiểm tra.");
+      console.error("Error fetching sessions:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleExport = () => {
-    const statusMapping = {
-      pending: 'Chờ xem xét',
-      approved: 'Đã duyệt',
-      redo_required: 'Yêu cầu làm lại'
-    };
+  const fetchResults = async (sessionId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("quiz_results")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false });
 
-    const dataToExport = results.map(result => {
-      const sessionQuestions = questions.filter(q => q.session_id === result.session_id);
-      const answersData: { [key: string]: string } = {};
-      
-      sessionQuestions.forEach((q, index) => {
-        const userAnswer = result.answers[q.id] || 'N/A';
-        const isCorrect = userAnswer === q.correct_answer;
-        answersData[`Câu ${index + 1}`] = userAnswer;
-        answersData[`Câu ${index + 1} (Kết quả)`] = isCorrect ? 'Đúng' : 'Sai';
-      });
+      if (error) throw error;
+      setResults(data);
+    } catch (err: any) {
+      setError("Không thể tải kết quả: " + err.message);
+      showError("Không thể tải kết quả.");
+      console.error("Error fetching results:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      return {
-        'Đợt kiểm tra': result.quiz_sessions?.name || 'Không rõ',
-        'Họ và tên': result.full_name,
-        'Ngày sinh': new Date(result.date_of_birth).toLocaleDateString('vi-VN'),
-        'Giới tính': result.gender,
-        'Số điện thoại': result.phone_number,
-        'Đơn vị công tác': result.workplace,
-        'Điểm': result.score,
-        'Trạng thái': statusMapping[result.status],
-        'Ngày làm bài': new Date(result.created_at).toLocaleString('vi-VN'),
-        ...answersData
-      };
-    });
+  const handleViewResult = (result: QuizResult) => {
+    setViewingResult(result);
+    setIsViewDialogOpen(true);
+  };
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Kết quả kiểm tra');
-    XLSX.writeFile(workbook, 'KetQuaKiemTra.xlsx');
+  const handleDeleteClick = (resultId: string) => {
+    setDeletingResultId(resultId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteResult = async () => {
+    if (!deletingResultId) return;
+
+    const loadingToast = showLoading("Đang xóa kết quả...");
+    const { error } = await supabase
+      .from("quiz_results")
+      .delete()
+      .eq("id", deletingResultId);
+    dismissToast(loadingToast);
+
+    if (error) {
+      showError("Xóa kết quả thất bại.");
+      console.error(error);
+    } else {
+      showSuccess("Xóa kết quả thành công.");
+      setResults(results.filter(r => r.id !== deletingResultId));
+      setIsDeleteDialogOpen(false);
+      setDeletingResultId(null);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 flex flex-col items-center">
-      <div className="w-full max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Kết quả các bài kiểm tra</CardTitle>
-              <CardDescription>Danh sách tất cả các bài kiểm tra đã được hoàn thành.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleExport} variant="outline" disabled={results.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Xuất ra Excel
-              </Button>
-              <Button onClick={() => navigate('/admin')} variant="outline">Về trang quản trị</Button>
-            </div>
+          <CardHeader>
+            <CardTitle>Quản lý kết quả kiểm tra</CardTitle>
+            <CardDescription>Xem và quản lý kết quả các bài kiểm tra đã hoàn thành.</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex items-center gap-2">
+              <Label htmlFor="session-select" className="whitespace-nowrap">Chọn đợt kiểm tra:</Label>
+              <Select
+                value={selectedSessionId || ""}
+                onValueChange={(value) => setSelectedSessionId(value)}
+                disabled={loading || quizSessions.length === 0}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Chọn đợt kiểm tra" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quizSessions.length === 0 ? (
+                    <SelectItem value="no-sessions" disabled>Không có đợt kiểm tra nào</SelectItem>
+                  ) : (
+                    quizSessions.map((session) => (
+                      <SelectItem key={session.id} value={session.id}>
+                        {session.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
             {error && <p className="text-red-500 text-center">{error}</p>}
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
-                    <TableHead>Đơn vị công tác</TableHead>
-                    <TableHead>Đợt kiểm tra</TableHead>
-                    <TableHead>Ngày làm bài</TableHead>
+                    <TableHead>Ngày sinh</TableHead>
+                    <TableHead>Số điện thoại</TableHead>
+                    <TableHead>Giới tính</TableHead>
+                    <TableHead>Nơi công tác</TableHead>
+                    <TableHead>Điểm</TableHead>
                     <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Điểm</TableHead>
+                    <TableHead>Thời gian nộp</TableHead>
+                    <TableHead className="text-right">Hành động</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    Array.from({ length: 10 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
-                      </TableRow>
-                    ))
+                    <TableRow><TableCell colSpan={9} className="text-center">Đang tải...</TableCell></TableRow>
                   ) : results.length > 0 ? (
                     results.map((result) => (
-                      <TableRow key={result.id} onClick={() => setSelectedResult(result)} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow key={result.id}>
                         <TableCell className="font-medium">{result.full_name}</TableCell>
+                        <TableCell>{format(new Date(result.date_of_birth), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{result.phone_number}</TableCell>
+                        <TableCell>{result.gender}</TableCell>
                         <TableCell>{result.workplace}</TableCell>
-                        <TableCell>{result.quiz_sessions?.name || 'N/A'}</TableCell>
-                        <TableCell>{new Date(result.created_at).toLocaleDateString("vi-VN")}</TableCell>
-                        <TableCell>{getStatusBadge(result.status)}</TableCell>
-                        <TableCell className="text-right">{result.score.toFixed(1)}</TableCell>
+                        <TableCell>{result.score !== null ? result.score : "N/A"}</TableCell>
+                        <TableCell>{result.status}</TableCell>
+                        <TableCell>{format(new Date(result.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" className="mr-2" onClick={() => handleViewResult(result)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(result.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        Chưa có kết quả nào được nộp.
-                      </TableCell>
+                      <TableCell colSpan={9} className="text-center">Không có kết quả nào cho đợt kiểm tra này.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -202,17 +227,84 @@ const AdminResultsPage = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
-      {selectedResult && (
-        <QuizResultDetail
-          isOpen={!!selectedResult}
-          onClose={() => setSelectedResult(null)}
-          result={selectedResult}
-          onStatusUpdate={handleStatusUpdate}
-        />
-      )}
-      <div className="mt-auto pt-8">
-        <MadeWithDyad />
+        <Button variant="link" onClick={() => navigate('/admin')} className="mt-4">
+          &larr; Quay lại trang quản trị
+        </Button>
+
+        {/* View Result Dialog */}
+        {viewingResult && (
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Chi tiết kết quả</DialogTitle>
+                <DialogDescription>Thông tin chi tiết về bài kiểm tra của {viewingResult.full_name}.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Họ và tên:</Label>
+                  <span className="col-span-3">{viewingResult.full_name}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Ngày sinh:</Label>
+                  <span className="col-span-3">{format(new Date(viewingResult.date_of_birth), "dd/MM/yyyy")}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Số điện thoại:</Label>
+                  <span className="col-span-3">{viewingResult.phone_number}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Giới tính:</Label>
+                  <span className="col-span-3">{viewingResult.gender}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Nơi công tác:</Label>
+                  <span className="col-span-3">{viewingResult.workplace}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Điểm:</Label>
+                  <span className="col-span-3 font-bold text-lg">{viewingResult.score !== null ? viewingResult.score : "N/A"}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Trạng thái:</Label>
+                  <span className="col-span-3">{viewingResult.status}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Thời gian nộp:</Label>
+                  <span className="col-span-3">{format(new Date(viewingResult.created_at), "dd/MM/yyyy HH:mm")}</span>
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Câu trả lời:</Label>
+                  <div className="col-span-3 max-h-60 overflow-y-auto border rounded-md p-2 bg-gray-50">
+                    {Object.entries(viewingResult.answers).map(([questionId, answer]) => (
+                      <p key={questionId} className="text-sm mb-1">
+                        <strong>Câu {questionId}:</strong> {answer}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setIsViewDialogOpen(false)}>Đóng</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Xác nhận xóa</DialogTitle>
+              <DialogDescription>
+                Bạn có chắc chắn muốn xóa kết quả này không? Hành động này không thể hoàn tác.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Hủy</Button>
+              <Button variant="destructive" onClick={handleDeleteResult}>Xóa</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
