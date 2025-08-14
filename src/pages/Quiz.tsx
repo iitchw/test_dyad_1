@@ -186,7 +186,6 @@ const QuizPage = () => {
                     </CardContent>
                     <CardFooter className="flex justify-center gap-4">
                         <Button onClick={resetQuiz}>Làm lại bài kiểm tra</Button>
-                        <Link to="/"><Button variant="outline">Về trang chủ</Button></Link>
                     </CardFooter>
                 </Card>
                 <MadeWithDyad />
