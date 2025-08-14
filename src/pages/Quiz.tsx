@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,29 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { MadeWithDyad } from "@/components/made-with-dyad";
-import { quizQuestions } from "@/lib/quizData";
 import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface Question {
+  id: string;
+  question_text: string;
+  options: { [key: string]: string };
+  correct_answer: string;
+}
+
+interface QuizSession {
+  id: string;
+  name: string;
+  questions: Question[];
+}
 
 const QuizPage = () => {
+    const { sessionId } = useParams();
+    const navigate = useNavigate();
+    const [session, setSession] = useState<QuizSession | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
     const [gender, setGender] = useState("");
@@ -24,6 +43,42 @@ const QuizPage = () => {
     const [score, setScore] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSupabaseConnected = !!supabase;
+
+    useEffect(() => {
+      const fetchQuizData = async () => {
+        if (!sessionId) {
+          setError("Không tìm thấy đợt kiểm tra.");
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+          const { data: sessionData, error: sessionError } = await supabase
+            .from("quiz_sessions")
+            .select("id, name")
+            .eq("id", sessionId)
+            .single();
+
+          if (sessionError || !sessionData) throw new Error("Không thể tải thông tin đợt kiểm tra.");
+
+          const { data: questionsData, error: questionsError } = await supabase
+            .from("questions")
+            .select("id, question_text, options, correct_answer")
+            .eq("session_id", sessionId);
+          
+          if (questionsError) throw new Error("Không thể tải câu hỏi.");
+
+          setSession({ ...sessionData, questions: questionsData || [] });
+        } catch (err: any) {
+          setError(err.message);
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchQuizData();
+    }, [sessionId]);
 
     const years = useMemo(() => {
         const currentYear = new Date().getFullYear();
@@ -57,11 +112,13 @@ const QuizPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!session || session.questions.length === 0) return;
+
         if (!fullName || !dobDay || !dobMonth || !dobYear || !phone || !gender) {
             showError("Vui lòng điền đầy đủ thông tin cá nhân.");
             return;
         }
-        if (Object.keys(answers).length !== quizQuestions.length) {
+        if (Object.keys(answers).length !== session.questions.length) {
             showError("Vui lòng trả lời tất cả các câu hỏi.");
             return;
         }
@@ -69,12 +126,12 @@ const QuizPage = () => {
         setIsSubmitting(true);
 
         let calculatedScore = 0;
-        quizQuestions.forEach(q => {
-            if (answers[q.id] === q.correctAnswer) {
+        session.questions.forEach(q => {
+            if (answers[q.id] === q.correct_answer) {
                 calculatedScore++;
             }
         });
-        const finalScore = (calculatedScore / quizQuestions.length) * 10;
+        const finalScore = (calculatedScore / session.questions.length) * 10;
 
         if (!isSupabaseConnected) {
             showError("Lỗi cấu hình: Không thể lưu kết quả vào hệ thống.");
@@ -94,6 +151,7 @@ const QuizPage = () => {
             gender: gender,
             answers: answers,
             score: finalScore,
+            session_id: sessionId,
         };
 
         try {
@@ -133,13 +191,58 @@ const QuizPage = () => {
         );
     }
 
+    if (loading) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-4xl p-8 space-y-6">
+            <Skeleton className="h-10 w-3/4" />
+            <Skeleton className="h-6 w-1/2" />
+            <div className="space-y-4 p-6 border rounded-lg">
+              <Skeleton className="h-8 w-1/4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-8 w-1/3" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
+    if (error || !session) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+          <h2 className="text-2xl font-bold text-red-600">Lỗi</h2>
+          <p className="text-gray-600 mt-2">{error || "Không thể tải đợt kiểm tra."}</p>
+          <Button onClick={() => navigate('/sessions')} className="mt-4">Quay lại</Button>
+        </div>
+      );
+    }
+
+    if (session.questions.length === 0) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+          <h2 className="text-2xl font-bold">Đợt kiểm tra này chưa có câu hỏi</h2>
+          <p className="text-gray-600 mt-2">Vui lòng quay lại sau.</p>
+          <Button onClick={() => navigate('/sessions')} className="mt-4">Quay lại</Button>
+        </div>
+      );
+    }
+
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
             <Card className="w-full max-w-4xl">
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle className="text-3xl">Bài kiểm tra kiến thức</CardTitle>
+                            <CardTitle className="text-3xl">{session.name}</CardTitle>
                             <CardDescription>Vui lòng điền thông tin và trả lời các câu hỏi dưới đây.</CardDescription>
                         </div>
                         <Badge className={isSupabaseConnected ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
@@ -200,9 +303,9 @@ const QuizPage = () => {
                         </div>
                         <div className="space-y-6">
                             <h3 className="text-xl font-semibold">Câu hỏi trắc nghiệm</h3>
-                            {quizQuestions.map((q, index) => (
+                            {session.questions.map((q, index) => (
                                 <div key={q.id} className="p-4 border rounded-lg">
-                                    <p className="font-medium mb-4">{`Câu ${index + 1}: ${q.question}`}</p>
+                                    <p className="font-medium mb-4">{`Câu ${index + 1}: ${q.question_text}`}</p>
                                     <RadioGroup value={answers[q.id]} onValueChange={(value) => handleAnswerChange(q.id, value)}>
                                         {Object.entries(q.options).map(([key, value]) => (
                                             <div key={key} className="flex items-center space-x-2">

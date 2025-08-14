@@ -9,7 +9,6 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { QuizResultDetail } from "@/components/QuizResultDetail";
 import * as XLSX from 'xlsx';
-import { quizQuestions } from "@/lib/quizData";
 import { Download } from "lucide-react";
 
 interface QuizResult {
@@ -22,10 +21,20 @@ interface QuizResult {
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
+  session_id: string;
+  quiz_sessions: { name: string } | null;
 }
 
-const AdminPage = () => {
+interface Question {
+  id: string;
+  session_id: string;
+  question_text: string;
+  correct_answer: string;
+}
+
+const AdminResultsPage = () => {
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null);
@@ -46,13 +55,21 @@ const AdminPage = () => {
       try {
         const { data, error } = await supabase
           .from("quiz_results")
-          .select("*")
+          .select("*, quiz_sessions(name)")
           .order("created_at", { ascending: false });
 
         if (error) throw error;
         setResults(data || []);
+
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("id, session_id, question_text, correct_answer");
+        
+        if (questionsError) throw questionsError;
+        setQuestions(questionsData || []);
+
       } catch (err: any) {
-        console.error("Error fetching quiz results:", err);
+        console.error("Error fetching data:", err);
         setError("Không thể tải kết quả. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
@@ -60,11 +77,6 @@ const AdminPage = () => {
     };
     fetchResults();
   }, []);
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("isAdminLoggedIn");
-    navigate("/");
-  };
 
   const handleStatusUpdate = (resultId: string, newStatus: 'approved' | 'redo_required') => {
     setResults(prevResults =>
@@ -92,15 +104,18 @@ const AdminPage = () => {
     };
 
     const dataToExport = results.map(result => {
+      const sessionQuestions = questions.filter(q => q.session_id === result.session_id);
       const answersData: { [key: string]: string } = {};
-      quizQuestions.forEach((q, index) => {
+      
+      sessionQuestions.forEach((q, index) => {
         const userAnswer = result.answers[q.id] || 'N/A';
-        const isCorrect = userAnswer === q.correctAnswer;
+        const isCorrect = userAnswer === q.correct_answer;
         answersData[`Câu ${index + 1}`] = userAnswer;
         answersData[`Câu ${index + 1} (Kết quả)`] = isCorrect ? 'Đúng' : 'Sai';
       });
 
       return {
+        'Đợt kiểm tra': result.quiz_sessions?.name || 'Không rõ',
         'Họ và tên': result.full_name,
         'Ngày sinh': new Date(result.date_of_birth).toLocaleDateString('vi-VN'),
         'Giới tính': result.gender,
@@ -124,7 +139,7 @@ const AdminPage = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Quản lý bài kiểm tra</CardTitle>
+              <CardTitle>Kết quả các bài kiểm tra</CardTitle>
               <CardDescription>Danh sách tất cả các bài kiểm tra đã được hoàn thành.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -132,7 +147,7 @@ const AdminPage = () => {
                 <Download className="mr-2 h-4 w-4" />
                 Xuất ra Excel
               </Button>
-              <Button onClick={handleLogout} variant="outline">Đăng xuất</Button>
+              <Button onClick={() => navigate('/admin')} variant="outline">Về trang quản trị</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -142,6 +157,7 @@ const AdminPage = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
+                    <TableHead>Đợt kiểm tra</TableHead>
                     <TableHead>Ngày làm bài</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead className="text-right">Điểm</TableHead>
@@ -152,6 +168,7 @@ const AdminPage = () => {
                     Array.from({ length: 10 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
@@ -161,6 +178,7 @@ const AdminPage = () => {
                     results.map((result) => (
                       <TableRow key={result.id} onClick={() => setSelectedResult(result)} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium">{result.full_name}</TableCell>
+                        <TableCell>{result.quiz_sessions?.name || 'N/A'}</TableCell>
                         <TableCell>{new Date(result.created_at).toLocaleDateString("vi-VN")}</TableCell>
                         <TableCell>{getStatusBadge(result.status)}</TableCell>
                         <TableCell className="text-right">{result.score.toFixed(1)}</TableCell>
@@ -168,7 +186,7 @@ const AdminPage = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         Chưa có kết quả nào được nộp.
                       </TableCell>
                     </TableRow>
@@ -194,4 +212,4 @@ const AdminPage = () => {
   );
 };
 
-export default AdminPage;
+export default AdminResultsPage;

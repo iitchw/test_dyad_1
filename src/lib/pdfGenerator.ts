@@ -1,24 +1,25 @@
 import { jsPDF } from "jspdf";
 import { showLoading, dismissToast, showError, showSuccess } from "@/utils/toast";
-import { quizQuestions } from "@/lib/quizData";
 
-// Cờ để đảm bảo font chỉ được khởi tạo một lần
 let isFontInitialized = false;
 
-// Hàm khởi tạo font động
 const initializePdfFont = async () => {
   if (isFontInitialized) return;
-
   if (typeof window !== 'undefined') {
-    // Gán jsPDF vào window để file font có thể truy cập
     window.jsPDF = jsPDF;
-    // Import động file font để đảm bảo nó chạy sau khi window.jsPDF được thiết lập
     await import('./fonts/Roboto-normal.js');
     isFontInitialized = true;
   }
 };
 
-interface QuizResult {
+interface Question {
+  id: string;
+  question_text: string;
+  options: { [key: string]: string };
+  correct_answer: string;
+}
+
+interface QuizResultWithQuestions {
   id: string;
   created_at: string;
   full_name: string;
@@ -28,13 +29,13 @@ interface QuizResult {
   score: number;
   status: 'pending' | 'approved' | 'redo_required';
   answers: { [key: string]: string };
+  questions: Question[]; // Questions are now passed in
 }
 
-export const generatePdfFromQuizResult = async (result: QuizResult, fileName: string) => {
+export const generatePdfFromQuizResult = async (result: QuizResultWithQuestions, fileName: string) => {
   const loadingToast = showLoading("Đang tạo file PDF...");
 
   try {
-    // Đảm bảo font đã được khởi tạo
     await initializePdfFont();
 
     const doc = new jsPDF({
@@ -43,27 +44,20 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
       format: 'a4',
     });
 
-    // Đăng ký và thiết lập font tùy chỉnh để hỗ trợ tiếng Việt
-    // Tên 'Roboto-normal.ttf' được định nghĩa bên trong file Roboto-normal.js
     doc.addFont('Roboto-normal.ttf', 'Roboto', 'normal');
     doc.setFont('Roboto');
-    doc.setTextColor(0, 0, 0); // Black color
+    doc.setTextColor(0, 0, 0);
 
-    let y = 20; // Vị trí Y ban đầu
+    let y = 20;
     const margin = 20;
     const lineHeight = 7;
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // --- Header ---
     doc.setFontSize(18);
     doc.text("KẾT QUẢ BÀI KIỂM TRA", pageWidth / 2, y, { align: 'center' });
-    y += lineHeight;
-    doc.setFontSize(12);
-    doc.text("Thông tư 07/2014/TT-BYT", pageWidth / 2, y, { align: 'center' });
     y += lineHeight * 2;
 
-    // --- Personal Information ---
     doc.setFontSize(14);
     doc.text("Thông tin cá nhân", margin, y);
     y += lineHeight;
@@ -80,45 +74,37 @@ export const generatePdfFromQuizResult = async (result: QuizResult, fileName: st
     doc.text(`Điểm số: ${result.score.toFixed(1)}/10`, margin, y);
     y += lineHeight * 2;
 
-    // --- Questions and Answers ---
     doc.setFontSize(14);
     doc.text("Câu hỏi và đáp án", margin, y);
     y += lineHeight * 1.5;
 
-    quizQuestions.forEach((q, index) => {
+    result.questions.forEach((q, index) => {
       const userAnswer = result.answers[q.id];
+      const questionText = `Câu ${index + 1}: ${q.question_text}`;
+      const optionsText = Object.entries(q.options).map(([key, value]) => `${key}. ${value}`).join('\n');
+      const answerText = `Bạn đã chọn: ${userAnswer || "Không trả lời"}\nĐáp án đúng: ${q.correct_answer}`;
+      
+      const questionLines = doc.splitTextToSize(questionText, pageWidth - (margin * 2));
+      const optionsLines = doc.splitTextToSize(optionsText, pageWidth - (margin * 2) - 5);
+      const answerLines = doc.splitTextToSize(answerText, pageWidth - (margin * 2));
 
-      // Kiểm tra xem có cần sang trang mới trước khi vẽ câu hỏi không
-      const estimatedQuestionHeight = (doc.splitTextToSize(`Câu ${index + 1}: ${q.question}`, pageWidth - (margin * 2)).length * lineHeight) +
-                                      (Object.keys(q.options).length * lineHeight * 1.5) + // Options
-                                      (lineHeight * 3); // User/Correct answers + spacing
+      const estimatedHeight = (questionLines.length + optionsLines.length + answerLines.length) * lineHeight + (lineHeight * 2);
 
-      if (y + estimatedQuestionHeight > pageHeight - margin) {
+      if (y + estimatedHeight > pageHeight - margin) {
         doc.addPage();
-        y = margin; // Reset y cho trang mới
-        doc.setFontSize(14);
-        doc.text("Câu hỏi và đáp án (tiếp theo)", margin, y);
-        y += lineHeight * 1.5;
+        y = margin;
       }
 
       doc.setFontSize(12);
-      const questionText = `Câu ${index + 1}: ${q.question}`;
-      const splitQuestion = doc.splitTextToSize(questionText, pageWidth - (margin * 2));
-      doc.text(splitQuestion, margin, y);
-      y += (splitQuestion.length * lineHeight);
+      doc.text(questionLines, margin, y);
+      y += (questionLines.length * lineHeight);
 
-      Object.entries(q.options).forEach(([key, value]) => {
-        const optionText = `${key}. ${value}`;
-        const splitOption = doc.splitTextToSize(optionText, pageWidth - (margin * 2) - 10); // Thụt lề các lựa chọn
-        doc.text(splitOption, margin + 5, y);
-        y += (splitOption.length * lineHeight);
-      });
-
+      doc.text(optionsLines, margin + 5, y);
+      y += (optionsLines.length * lineHeight);
+      
       y += lineHeight * 0.5;
-      doc.text(`Bạn đã chọn: ${userAnswer || "Không trả lời"}`, margin, y);
-      y += lineHeight;
-      doc.text(`Đáp án đúng: ${q.correctAnswer}`, margin, y);
-      y += lineHeight * 1.5; // Khoảng cách sau mỗi câu hỏi
+      doc.text(answerLines, margin, y);
+      y += (answerLines.length * lineHeight) + (lineHeight * 1.5);
     });
 
     doc.save(`${fileName}.pdf`);

@@ -44,7 +44,7 @@ const Index = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-        <Link to="/quiz" className="block">
+        <Link to="/sessions" className="block">
           <Card className="h-full hover:shadow-lg hover:border-primary transition-all duration-300">
             <CardHeader className="flex-row items-center gap-4 p-4">
               <FileText className="w-10 h-10 text-primary" />
@@ -52,7 +52,7 @@ const Index = () => {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-gray-600 dark:text-gray-400">
-                Bắt đầu bài kiểm tra kiến thức về Thông tư 07/2014/TT-BYT.
+                Bắt đầu bài kiểm tra bằng cách chọn một đợt kiểm tra có sẵn.
               </p>
             </CardContent>
           </Card>
@@ -62,11 +62,11 @@ const Index = () => {
             <Card onClick={handleCardClick} className="h-full hover:shadow-lg hover:border-primary transition-all duration-300 cursor-pointer">
               <CardHeader className="flex-row items-center gap-4 p-4">
                 <Shield className="w-10 h-10 text-primary" />
-                <CardTitle className="text-2xl">Quản lý bài kiểm tra</CardTitle>
+                <CardTitle className="text-2xl">Quản lý</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <p className="text-gray-600 dark:text-gray-400">
-                  Truy cập khu vực quản lý để xem tất cả kết quả. Yêu cầu đăng nhập.
+                  Truy cập khu vực quản lý. Yêu cầu đăng nhập.
                 </p>
               </CardContent>
             </Card>
