@@ -26,6 +26,16 @@ interface QuizSession {
   questions: Question[];
 }
 
+// Helper function to shuffle an array
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 const QuizPage = () => {
     const { sessionId } = useParams();
     const navigate = useNavigate();
@@ -70,7 +80,15 @@ const QuizPage = () => {
           
           if (questionsError) throw new Error("Không thể tải câu hỏi.");
 
-          setSession({ ...sessionData, questions: questionsData || [] });
+          // Shuffle questions and their options
+          const shuffledQuestions = shuffleArray(questionsData || []).map(question => {
+            const optionsEntries = Object.entries(question.options);
+            const shuffledOptionsEntries = shuffleArray(optionsEntries);
+            const shuffledOptions = Object.fromEntries(shuffledOptionsEntries);
+            return { ...question, options: shuffledOptions };
+          });
+
+          setSession({ ...sessionData, questions: shuffledQuestions });
         } catch (err: any) {
           setError(err.message);
           console.error(err);
