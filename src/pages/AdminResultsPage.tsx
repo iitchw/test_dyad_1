@@ -16,7 +16,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Trash2, Download } from "lucide-react";
+import * as XLSX from 'xlsx';
+import QuizResultDetail from "@/components/QuizResultDetail";
 
 interface QuizResult {
   id: string;
@@ -27,9 +29,10 @@ interface QuizResult {
   workplace: string;
   answers: { [key: string]: string };
   score: number;
-  status: string;
+  status: 'pending' | 'approved' | 'redo_required';
   created_at: string;
   session_id: string;
+  quiz_sessions: { name: string } | null;
 }
 
 interface QuizSession {
@@ -62,7 +65,6 @@ const AdminResultsPage = () => {
     if (selectedSessionId) {
       fetchResults(selectedSessionId);
     } else if (quizSessions.length > 0) {
-      // Automatically select the first session if available
       setSelectedSessionId(quizSessions[0].id);
     }
   }, [selectedSessionId, quizSessions]);
@@ -79,12 +81,11 @@ const AdminResultsPage = () => {
       if (error) throw error;
       setQuizSessions(data);
       if (data.length > 0) {
-        setSelectedSessionId(data[0].id); // Select the most recent session by default
+        setSelectedSessionId(data[0].id);
       }
     } catch (err: any) {
       setError("Không thể tải danh sách đợt kiểm tra: " + err.message);
       showError("Không thể tải danh sách đợt kiểm tra.");
-      console.error("Error fetching sessions:", err);
     } finally {
       setLoading(false);
     }
@@ -96,16 +97,15 @@ const AdminResultsPage = () => {
     try {
       const { data, error } = await supabase
         .from("quiz_results")
-        .select("*")
+        .select("*, quiz_sessions(name)")
         .eq("session_id", sessionId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setResults(data);
+      setResults(data as QuizResult[]);
     } catch (err: any) {
       setError("Không thể tải kết quả: " + err.message);
       showError("Không thể tải kết quả.");
-      console.error("Error fetching results:", err);
     } finally {
       setLoading(false);
     }
@@ -123,17 +123,14 @@ const AdminResultsPage = () => {
 
   const handleDeleteResult = async () => {
     if (!deletingResultId) return;
-
     const loadingToast = showLoading("Đang xóa kết quả...");
     const { error } = await supabase
       .from("quiz_results")
       .delete()
       .eq("id", deletingResultId);
     dismissToast(loadingToast);
-
     if (error) {
       showError("Xóa kết quả thất bại.");
-      console.error(error);
     } else {
       showSuccess("Xóa kết quả thành công.");
       setResults(results.filter(r => r.id !== deletingResultId));
@@ -142,13 +139,49 @@ const AdminResultsPage = () => {
     }
   };
 
+  const handleExportXLSX = () => {
+    if (results.length === 0) {
+      showError("Không có dữ liệu để xuất.");
+      return;
+    }
+    const dataToExport = results.map(r => ({
+      "Họ và tên": r.full_name,
+      "Ngày sinh": format(new Date(r.date_of_birth), "dd/MM/yyyy"),
+      "Số điện thoại": r.phone_number,
+      "Giới tính": r.gender,
+      "Nơi công tác": r.workplace,
+      "Điểm": r.score,
+      "Trạng thái": r.status,
+      "Thời gian nộp": format(new Date(r.created_at), "dd/MM/yyyy HH:mm"),
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả");
+    const sessionName = quizSessions.find(s => s.id === selectedSessionId)?.name || "session";
+    XLSX.writeFile(workbook, `KetQua_${sessionName.replace(/\s/g, '_')}.xlsx`);
+  };
+
+  const handleStatusUpdate = (resultId: string, newStatus: 'approved' | 'redo_required') => {
+    setResults(prevResults =>
+      prevResults.map(r => (r.id === resultId ? { ...r, status: newStatus } : r))
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Quản lý kết quả kiểm tra</CardTitle>
-            <CardDescription>Xem và quản lý kết quả các bài kiểm tra đã hoàn thành.</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Quản lý kết quả kiểm tra</CardTitle>
+                <CardDescription>Xem và quản lý kết quả các bài kiểm tra đã hoàn thành.</CardDescription>
+              </div>
+              <Button onClick={handleExportXLSX}>
+                <Download className="mr-2 h-4 w-4" />
+                Xuất ra Excel
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4 flex items-center gap-2">
@@ -182,9 +215,6 @@ const AdminResultsPage = () => {
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
                     <TableHead>Ngày sinh</TableHead>
-                    <TableHead>Số điện thoại</TableHead>
-                    <TableHead>Giới tính</TableHead>
-                    <TableHead>Nơi công tác</TableHead>
                     <TableHead>Điểm</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead>Thời gian nộp</TableHead>
@@ -193,16 +223,13 @@ const AdminResultsPage = () => {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center">Đang tải...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center">Đang tải...</TableCell></TableRow>
                   ) : results.length > 0 ? (
                     results.map((result) => (
                       <TableRow key={result.id}>
                         <TableCell className="font-medium">{result.full_name}</TableCell>
                         <TableCell>{format(new Date(result.date_of_birth), "dd/MM/yyyy")}</TableCell>
-                        <TableCell>{result.phone_number}</TableCell>
-                        <TableCell>{result.gender}</TableCell>
-                        <TableCell>{result.workplace}</TableCell>
-                        <TableCell>{result.score !== null ? result.score : "N/A"}</TableCell>
+                        <TableCell>{result.score !== null ? result.score.toFixed(1) : "N/A"}</TableCell>
                         <TableCell>{result.status}</TableCell>
                         <TableCell>{format(new Date(result.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
                         <TableCell className="text-right">
@@ -217,7 +244,7 @@ const AdminResultsPage = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center">Không có kết quả nào cho đợt kiểm tra này.</TableCell>
+                      <TableCell colSpan={6} className="text-center">Không có kết quả nào cho đợt kiểm tra này.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -229,66 +256,13 @@ const AdminResultsPage = () => {
           &larr; Quay lại trang quản trị
         </Button>
 
-        {/* View Result Dialog */}
-        {viewingResult && (
-          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Chi tiết kết quả</DialogTitle>
-                <DialogDescription>Thông tin chi tiết về bài kiểm tra của {viewingResult.full_name}.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Họ và tên:</Label>
-                  <span className="col-span-3">{viewingResult.full_name}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Ngày sinh:</Label>
-                  <span className="col-span-3">{format(new Date(viewingResult.date_of_birth), "dd/MM/yyyy")}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Số điện thoại:</Label>
-                  <span className="col-span-3">{viewingResult.phone_number}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Giới tính:</Label>
-                  <span className="col-span-3">{viewingResult.gender}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Nơi công tác:</Label>
-                  <span className="col-span-3">{viewingResult.workplace}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Điểm:</Label>
-                  <span className="col-span-3 font-bold text-lg">{viewingResult.score !== null ? viewingResult.score : "N/A"}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Trạng thái:</Label>
-                  <span className="col-span-3">{viewingResult.status}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Thời gian nộp:</Label>
-                  <span className="col-span-3">{format(new Date(viewingResult.created_at), "dd/MM/yyyy HH:mm")}</span>
-                </div>
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">Câu trả lời:</Label>
-                  <div className="col-span-3 max-h-60 overflow-y-auto border rounded-md p-2 bg-gray-50">
-                    {Object.entries(viewingResult.answers).map(([questionId, answer]) => (
-                      <p key={questionId} className="text-sm mb-1">
-                        <strong>Câu {questionId}:</strong> {answer}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={() => setIsViewDialogOpen(false)}>Đóng</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        <QuizResultDetail
+          isOpen={isViewDialogOpen}
+          onClose={() => setIsViewDialogOpen(false)}
+          result={viewingResult}
+          onStatusUpdate={handleStatusUpdate}
+        />
 
-        {/* Delete Confirmation Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
