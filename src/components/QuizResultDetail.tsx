@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,8 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { quizQuestions } from "@/lib/quizData";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { CheckCircle2, XCircle, Printer } from "lucide-react";
-import { generatePdfFromElement } from "@/lib/pdfGenerator";
-import { PrintableResult } from "./PrintableResult";
+import { generatePdfFromQuizResult } from "@/lib/pdfGenerator"; // Updated import
 
 interface QuizResult {
   id: string;
@@ -29,7 +27,7 @@ interface Props {
 }
 
 export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Props) => {
-  const printComponentRef = useRef<HTMLDivElement>(null);
+  // Removed printComponentRef as it's no longer needed for html2canvas
 
   const handleStatusUpdate = async (newStatus: 'approved' | 'redo_required') => {
     const loadingToast = showLoading("Đang cập nhật trạng thái...");
@@ -53,18 +51,13 @@ export const QuizResultDetail = ({ result, isOpen, onClose, onStatusUpdate }: Pr
   };
 
   const handlePrint = () => {
-    if (printComponentRef.current) {
-      generatePdfFromElement(printComponentRef.current, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`);
-    } else {
-      showError("Không thể chuẩn bị nội dung để in. Vui lòng thử lại.");
-    }
+    // Call the new PDF generation function directly with the result data
+    generatePdfFromQuizResult(result, `KetQuaKiemTra_${result.full_name.replace(/ /g, '_')}`);
   };
 
   return (
     <>
-      <div style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -1 }}>
-        <PrintableResult ref={printComponentRef} result={result} />
-      </div>
+      {/* Removed the hidden PrintableResult component */}
 
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-3xl">
