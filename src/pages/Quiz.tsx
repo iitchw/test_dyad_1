@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Question {
   id: string;
   question_text: string;
-  options: { [key: string]: string };
+  options: { key: string; value: string }[];
   correct_answer: string;
 }
 
@@ -80,12 +80,12 @@ const QuizPage = () => {
           
           if (questionsError) throw new Error("Không thể tải câu hỏi.");
 
-          // Shuffle questions and their options
+          // Shuffle questions and transform their options
           const shuffledQuestions = shuffleArray(questionsData || []).map(question => {
             const optionsEntries = Object.entries(question.options as { [key: string]: string });
             const shuffledOptionsEntries = shuffleArray(optionsEntries);
-            const shuffledOptions = Object.fromEntries(shuffledOptionsEntries);
-            return { ...question, options: shuffledOptions };
+            const transformedOptions = shuffledOptionsEntries.map(([key, value]) => ({ key, value }));
+            return { ...question, options: transformedOptions };
           });
 
           setSession({ ...sessionData, questions: shuffledQuestions });
@@ -330,11 +330,11 @@ const QuizPage = () => {
                             {session.questions.map((q, index) => (
                                 <div key={q.id} className="p-4 border rounded-lg">
                                     <p className="font-medium mb-4">{`Câu ${index + 1}: ${q.question_text}`}</p>
-                                    <RadioGroup value={answers[q.id]} onValueChange={(value) => handleAnswerChange(q.id, value)}>
-                                        {Object.entries(q.options).map(([key, value]) => (
-                                            <div key={key} className="flex items-center space-x-2">
-                                                <RadioGroupItem value={key} id={`${q.id}-${key}`} />
-                                                <Label htmlFor={`${q.id}-${key}`}>{`${key}. ${value}`}</Label>
+                                    <RadioGroup value={answers[q.id] || ""} onValueChange={(value) => handleAnswerChange(q.id, value)}>
+                                        {q.options.map((option) => (
+                                            <div key={option.key} className="flex items-center space-x-2 mb-2">
+                                                <RadioGroupItem value={option.key} id={`${q.id}-${option.key}`} />
+                                                <Label htmlFor={`${q.id}-${option.key}`}>{option.value}</Label>
                                             </div>
                                         ))}
                                     </RadioGroup>
